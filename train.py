@@ -11,7 +11,7 @@ from modules.custom_layers import CustomMultiHeadAttention  # CustomMultiHeadAtt
 # プロジェクトのルートディレクトリをPythonパスに追加
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 # データセットの保存先ディレクトリ
-encode_dir_path = "./dataset/preprocessed/"
+encode_dir_path = "./components/dataset/preprocessed/"
 
 # モデル保存先ディレクトリ
 model_save_path = "./models/"

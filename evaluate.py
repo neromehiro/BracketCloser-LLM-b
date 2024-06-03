@@ -1,3 +1,4 @@
+import sys
 import os
 import json
 import numpy as np
@@ -7,26 +8,31 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import MultiHeadAttention
 from typing import List
 
+# モジュールのパスを追加
+sys.path.append(os.path.join(os.path.dirname(__file__), 'modules'))
+
+import data_generator
+
 # ログ設定
 logging.basicConfig(filename='debug_log.txt', level=logging.DEBUG, 
                     format='%(asctime)s %(levelname)s: %(message)s')
 
 # ディレクトリ設定
 dirs = {
-    "original": "./dataset/original",
-    "tokenize": "./dataset/tokenize",
-    "preprocessed": "./dataset/preprocessed",
+    "original": "./components/dataset/original",
+    "tokenize": "./components/dataset/tokenize",
+    "preprocessed": "./components/dataset/preprocessed",
 }
 
 # モデルの保存パス
 model_save_path = "./models/best_model.h5"
-# model_save_path = "./models/temp_model.h5"
 
 # テストデータの保存パス
 test_data_path = os.path.join(dirs["original"], "test_bracket_dataset.json")
 
 # 評価結果の保存パス
 evaluation_result_path = "evaluation_result.txt"
+
 
 # トークンとIDを対応付ける辞書
 tokens = ["(", ")", "【", "】", "{", "}", "input", ",output", ","]
@@ -142,6 +148,16 @@ def evaluate_model(model, test_data: List[str], model_type: str):
         f.write(f"\nAccuracy: {accuracy * 100:.2f}%")
 
     return accuracy
+
+# テストデータのサンプル数
+num_test_samples = 100
+
+# テストデータの生成
+test_dataset = data_generator.generate_test_data(num_test_samples)
+
+# テストデータの前処理と保存
+data_generator.preprocess_and_save_dataset(test_dataset, "test_bracket_dataset.json")
+print("テストデータセットが保存された場所:", data_generator.dirs["original"] + "/test_bracket_dataset.json")
 
 # テストデータのロード
 test_data = load_dataset(test_data_path)

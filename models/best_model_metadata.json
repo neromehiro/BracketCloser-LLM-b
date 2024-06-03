@@ -1,10 +1,10 @@
 {
-    "epochs": 3,
-    "batch_size": 256,
-    "num_files": 10,
+    "epochs": 1,
+    "batch_size": 128,
+    "num_files": 5,
     "learning_rate": 0.01,
-    "dataset_size": 127666,
+    "dataset_size": 0,
     "model_size_MB": 0.1496734619140625,
-    "model_params": 34314,
-    "model_architecture": "define_lstm_model"
+    "model_params": 398474,
+    "model_architecture": "define_gpt_model"
 }
