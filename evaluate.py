@@ -20,6 +20,7 @@ dirs = {
 
 # モデルの保存パス
 model_save_path = "./models/best_model.h5"
+# model_save_path = "./models/temp_model.h5"
 
 # テストデータの保存パス
 test_data_path = os.path.join(dirs["original"], "test_bracket_dataset.json")

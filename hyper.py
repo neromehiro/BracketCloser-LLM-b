@@ -2,7 +2,9 @@ import optuna
 import sys
 import os
 import numpy as np
+import time
 from datetime import datetime, timedelta
+from tqdm import tqdm
 from modules.data_utils import load_dataset, prepare_sequences, tokens
 from modules.model_utils import define_gru_model, define_transformer_model, define_lstm_model, define_bert_model, define_gpt_model
 from modules.training_utils import train_model, plot_training_history, save_metadata
@@ -10,6 +12,9 @@ from modules.training_utils import train_model, plot_training_history, save_meta
 # 訓練データのパス
 encode_dir_path = "./dataset/preprocessed/"
 model_save_path = "./models/"
+study_name = "model_optimization_study"  # Study name for Optuna
+storage_name = "sqlite:///optuna_study.db"  # SQLite database for Optuna
+best_model_path = f"{model_save_path}best_model.h5"  # Best model path
 
 # モデルアーキテクチャの辞書
 MODEL_ARCHITECTURES = {
@@ -23,6 +28,7 @@ MODEL_ARCHITECTURES = {
 # 初期設定のグローバル変数
 model_architecture_func = None
 architecture = None
+best_loss = float('inf')
 
 def setup(architecture_name):
     global model_architecture_func, architecture
@@ -44,7 +50,7 @@ def parse_time_limit(time_limit_str):
         raise ValueError("Unsupported time limit format. Use 'min' or 'hour'.")
 
 def objective(trial):
-    global model_architecture_func, architecture
+    global model_architecture_func, architecture, best_loss
     
     # ハイパーパラメータの範囲を設定
     epochs = trial.suggest_int("epochs", 1, 100)
@@ -80,7 +86,7 @@ def objective(trial):
     all_target_tokens = np.array(all_target_tokens)
 
     # 一時的なモデル保存パス
-    temp_model_path = f"{model_save_path}temp_model.h5"
+    temp_model_path = f"{model_save_path}temp_model_{trial.number}.h5"
 
     # モデルの訓練
     history, dataset_size = train_model(model, all_input_sequences, all_target_tokens, epochs=epochs, batch_size=batch_size, model_path=temp_model_path, num_files=num_files, learning_rate=learning_rate, architecture=architecture)
@@ -91,6 +97,10 @@ def objective(trial):
         return float('inf')
     else:
         loss = history.history['loss'][-1]
+        if loss < best_loss:
+            best_loss = loss
+            model.save(best_model_path)
+            print(f"New best model saved with loss: {best_loss}")
         return loss
 
 def main():
@@ -99,9 +109,33 @@ def main():
     
     time_limit_str = input("Enter the training time limit (e.g., '3min', '1hour', '5hour'): ").strip()
     time_limit = parse_time_limit(time_limit_str)
+    start_time = datetime.now()
+
+    # Optunaのストレージを設定
+    study = optuna.create_study(
+        study_name=study_name, 
+        direction="minimize", 
+        storage=storage_name, 
+        load_if_exists=True
+    )
     
-    study = optuna.create_study(direction="minimize")
-    study.optimize(objective, timeout=time_limit.total_seconds())
+    progress_bar = tqdm(total=time_limit.total_seconds(), desc="Optimization Progress", unit="s")
+
+    def callback(study, trial):
+        elapsed_time = (datetime.now() - start_time).total_seconds()
+        progress_bar.update(elapsed_time - progress_bar.n)
+        if elapsed_time >= time_limit.total_seconds():
+            progress_bar.close()
+            print("Time limit exceeded, stopping optimization.")
+            study.stop()
+
+    # トライアルの最適化
+    try:
+        study.optimize(objective, timeout=time_limit.total_seconds(), callbacks=[callback])
+    except Exception as e:
+        print(f"An exception occurred during optimization: {e}")
+    finally:
+        progress_bar.close()
 
     print("Best hyperparameters: ", study.best_params)
     print("Best loss: ", study.best_value)
@@ -141,7 +175,7 @@ def main():
     all_input_sequences = np.array(all_input_sequences)
     all_target_tokens = np.array(all_target_tokens)
 
-    model_path = f"{model_save_path}best_model.h5"
+    model_path = best_model_path
     plot_path = f"{model_save_path}training_history.png"
 
     history, dataset_size = train_model(model, all_input_sequences, all_target_tokens, epochs=epochs, batch_size=batch_size, model_path=model_path, num_files=num_files, learning_rate=learning_rate, architecture=architecture)
