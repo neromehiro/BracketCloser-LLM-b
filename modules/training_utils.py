@@ -1,22 +1,20 @@
+# modules/training_utils.py
+
 import os
 import time
 import json  # jsonモジュールをインポート
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.keras.callbacks import Callback, ModelCheckpoint
+import numpy as np
 
-class TrainingHistory(Callback):
+
+class TrainingHistory(tf.keras.callbacks.Callback):
     def on_train_begin(self, logs={}):
-        self.losses = []
-        self.accuracies = []
-        self.val_losses = []
-        self.val_accuracies = []
+        self.history = []
 
     def on_epoch_end(self, epoch, logs={}):
-        self.losses.append(logs.get('loss'))
-        self.accuracies.append(logs.get('accuracy'))
-        self.val_losses.append(logs.get('val_loss'))
-        self.val_accuracies.append(logs.get('val_accuracy'))
+        self.history.append(logs.copy())
 
 class TimeHistory(Callback):
     def on_train_begin(self, logs={}):
@@ -28,61 +26,83 @@ class TimeHistory(Callback):
     def on_epoch_end(self, batch, logs={}):
         self.times.append(time.time() - self.epoch_time_start)
 
-def train_model(model, input_sequences, target_tokens, epochs, batch_size, model_path, num_files, learning_rate):
+
+def train_model(model, input_sequences, target_tokens, epochs, batch_size, model_path, num_files, learning_rate, architecture):
     if len(input_sequences) > 0 and len(target_tokens) > 0:
         print(f"Shapes: {input_sequences.shape}, {target_tokens.shape}")
-        
+
         validation_split = 0.2
         num_validation_samples = int(validation_split * len(input_sequences))
-        
-        train_dataset = tf.data.Dataset.from_tensor_slices((input_sequences[:-num_validation_samples], target_tokens[:-num_validation_samples]))
-        validation_dataset = tf.data.Dataset.from_tensor_slices((input_sequences[-num_validation_samples:], target_tokens[-num_validation_samples:]))
+
+        if 'transformer' in architecture or 'gpt' in architecture:
+            attention_mask = np.ones_like(input_sequences)
+            train_dataset = tf.data.Dataset.from_tensor_slices(
+                ({'input_1': input_sequences[:-num_validation_samples], 'input_2': attention_mask[:-num_validation_samples]}, target_tokens[:-num_validation_samples])
+            )
+            validation_dataset = tf.data.Dataset.from_tensor_slices(
+                ({'input_1': input_sequences[-num_validation_samples:], 'input_2': attention_mask[-num_validation_samples:]}, target_tokens[-num_validation_samples:])
+            )
+        else:
+            train_dataset = tf.data.Dataset.from_tensor_slices(
+                (input_sequences[:-num_validation_samples], target_tokens[:-num_validation_samples])
+            )
+            validation_dataset = tf.data.Dataset.from_tensor_slices(
+                (input_sequences[-num_validation_samples:], target_tokens[-num_validation_samples:])
+            )
 
         train_dataset = train_dataset.shuffle(buffer_size=1024).batch(batch_size)
         validation_dataset = validation_dataset.batch(batch_size)
-        
+
+        # データセットの形状を確認
+        for data, labels in train_dataset.take(1):
+            if isinstance(data, dict):
+                for key, value in data.items():
+                    print(f"Train data batch shape for {key}: {value.shape}")
+            else:
+                print("Train data batch shape: ", data.shape)
+            print("Train labels batch shape: ", labels.shape)
+
         time_callback = TimeHistory()
         checkpoint_callback = ModelCheckpoint(model_path, save_best_only=True, monitor='val_loss', mode='min', verbose=1)
         history_callback = TrainingHistory()
 
-        start_time = time.time()
         history = model.fit(train_dataset, epochs=epochs, validation_data=validation_dataset, callbacks=[time_callback, checkpoint_callback, history_callback])
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        print(f"Training finished. Time taken: {elapsed_time} seconds.")
-        average_epoch_time = sum(time_callback.times) / len(time_callback.times)
-        print(f"Average time per epoch: {average_epoch_time} seconds.")
+
+        model.save(model_path, include_optimizer=False, save_format='h5')
         
-        return history_callback, len(input_sequences)
+        return history_callback.history, len(input_sequences)
     else:
-        print(f"No data for training.")
+        print("No data for training.")
         return None, 0
 
-def plot_training_history(history, save_path='training_history.png', epochs=None, batch_size=None, learning_rate=None, num_files=None, dataset_size=None):
-    epochs_range = range(1, len(history.losses) + 1)
+def plot_training_history(history, save_path, epochs, batch_size, learning_rate, num_files, dataset_size):
+    losses = [epoch_logs['loss'] for epoch_logs in history]
+    val_losses = [epoch_logs['val_loss'] for epoch_logs in history]
+    accuracies = [epoch_logs['accuracy'] for epoch_logs in history]
+    val_accuracies = [epoch_logs['val_accuracy'] for epoch_logs in history]
 
-    plt.figure(figsize=(12, 4))
+    epochs_range = range(1, len(losses) + 1)
+
+    plt.figure(figsize=(12, 6))
 
     plt.subplot(1, 2, 1)
-    plt.plot(epochs_range, history.losses, label='Training loss')
-    plt.plot(epochs_range, history.val_losses, label='Validation loss')
-    plt.title('Loss')
+    plt.plot(epochs_range, losses, label='Training Loss')
+    plt.plot(epochs_range, val_losses, label='Validation Loss')
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
+    plt.title('Training and Validation Loss')
     plt.legend()
 
     plt.subplot(1, 2, 2)
-    plt.plot(epochs_range, history.accuracies, label='Training accuracy')
-    plt.plot(epochs_range, history.val_accuracies, label='Validation accuracy')
-    plt.title('Accuracy')
+    plt.plot(epochs_range, accuracies, label='Training Accuracy')
+    plt.plot(epochs_range, val_accuracies, label='Validation Accuracy')
     plt.xlabel('Epochs')
     plt.ylabel('Accuracy')
+    plt.title('Training and Validation Accuracy')
     plt.legend()
 
-    textstr = f'Dataset size: {dataset_size}\nNum files: {num_files}\nEpochs: {epochs}\nBatch size: {batch_size}\nLearning rate: {learning_rate}'
-    plt.gcf().text(0.75, 0.5, textstr, fontsize=10, verticalalignment='center', bbox=dict(facecolor='white', alpha=0.5))
-
     plt.tight_layout()
+    plt.suptitle(f'Epochs: {epochs}, Batch Size: {batch_size}, Learning Rate: {learning_rate}, Files: {num_files}, Dataset Size: {dataset_size}', y=1.05)
     plt.savefig(save_path)
     plt.close()
 

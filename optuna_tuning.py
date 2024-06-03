@@ -3,6 +3,7 @@ import sys
 import optuna
 import numpy as np
 import tensorflow as tf
+from custom_layers import CustomMultiHeadAttention  # CustomMultiHeadAttentionをインポート
 from modules.data_utils import load_dataset, prepare_sequences, tokens
 from modules.model_utils import define_gpt_model
 from modules.training_utils import train_model, plot_training_history, save_metadata
@@ -14,7 +15,6 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 encode_dir_path = "./dataset/preprocessed/"
 model_save_path = "./models/"
 study_db_path = "sqlite:///optuna_study.db"  # Optunaの試行結果を保存するSQLiteデータベースのパス
-
 
 def objective(trial):
     # ハイパーパラメータの定義

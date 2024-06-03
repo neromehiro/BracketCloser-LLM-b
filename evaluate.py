@@ -1,9 +1,11 @@
+
 import os
 import json
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import load_model
-from tensorflow.keras.layers import MultiHeadAttention
+from modules.custom_layers import CustomMultiHeadAttention  # CustomMultiHeadAttentionをインポート
+from modules.data_utils import load_dataset, prepare_sequences  # 必要なモジュールのインポート
 from typing import List
 
 # ディレクトリ設定
@@ -17,87 +19,52 @@ dirs = {
 model_save_path = "./models/best_model.h5"
 
 # テストデータの保存パス
-test_data_path = os.path.join(dirs["original"], "test_bracket_dataset.json")
+preprocessed_test_data_path = os.path.join(dirs["preprocessed"], "test_bracket_dataset.json")
 
 # 評価結果の保存パス
 evaluation_result_path = "evaluation_result.txt"
 
-# トークンとIDを対応付ける辞書
-tokens = ["(", ")", "【", "】", "{", "}", "input", ",output", ","]
-token2id = {token: i for i, token in enumerate(tokens)}
-id2token = {i: token for token, i in token2id.items()}
+# モデルをロード
+model = load_model(model_save_path, custom_objects={'CustomMultiHeadAttention': CustomMultiHeadAttention})
 
-# モデルのロード
-model = load_model(model_save_path, custom_objects={'MultiHeadAttention': MultiHeadAttention})
-
-def load_dataset(filepath: str) -> List[str]:
+def load_preprocessed_dataset(filepath: str) -> List[list]:
     with open(filepath, "r", encoding="utf-8") as f:
         dataset = json.load(f)
+    print("Loaded preprocessed dataset:", dataset)  # データの中身を確認
     return dataset
 
-def tokenize_string(string: str) -> List[str]:
-    tokens = []
-    current_token = ""
-    for char in string:
-        if char in token2id:
-            if current_token:
-                tokens.append(current_token)
-                current_token = ""
-            tokens.append(char)
-        else:
-            current_token += char
-    if current_token:
-        tokens.append(current_token)
-    return tokens
+def data_generator(data):
+    for encoded_tokens_list in data:
+        input_sequences, target_tokens = prepare_sequences(encoded_tokens_list, seq_length=len(encoded_tokens_list))
+        for input_seq, target_token in zip(input_sequences, target_tokens):
+            yield input_seq, target_token
 
-def preprocess_input(input_seq: str) -> List[int]:
-    tokens = tokenize_string(input_seq)
-    return [token2id[token] for token in tokens if token in token2id]
+def evaluate_model(model, data):
+    dataset = tf.data.Dataset.from_generator(
+        lambda: data_generator(data),
+        output_signature=(
+            tf.TensorSpec(shape=(None,), dtype=tf.int32),
+            tf.TensorSpec(shape=(), dtype=tf.int32)
+        )
+    ).padded_batch(1, padded_shapes=([None], ()))
 
-def decode_output(output_seq: List[int]) -> str:
-    return "".join([id2token[id] for id in output_seq if id in id2token])
+    true_outputs = []
+    predicted_classes = []
 
-def evaluate_model(model, test_data: List[str]):
-    correct_predictions = 0
-    results = []
+    for input_seq, true_output in dataset:
+        predicted_output = model.predict(input_seq)
+        true_outputs.append(true_output.numpy())
+        predicted_classes.append(np.argmax(predicted_output, axis=-1))
 
-    for data in test_data:
-        input_seq = data.split(",")[0].split(":")[1]
-        expected_output = data.split(",")[1].split(":")[1]
+    true_outputs = np.concatenate(true_outputs)
+    predicted_classes = np.concatenate(predicted_classes)
 
-        # Preprocessing
-        preprocessed_input = preprocess_input(input_seq)
-        preprocessed_input = np.array(preprocessed_input).reshape(1, -1)
+    accuracy = np.mean(predicted_classes == true_outputs)
 
-        predicted_output_ids = []
-        for i in range(len(expected_output)):
-            # Create attention_mask based on the current input length
-            attention_mask = np.zeros((1, preprocessed_input.shape[1]), dtype=np.float32)
-            attention_mask[:, :i+1] = 1.0
-
-            # Combine input and attention mask
-            combined_input = np.concatenate([preprocessed_input, attention_mask], axis=-1)
-
-            # Log output shapes
-            print(f"combined_input shape: {combined_input.shape}")
-
-            # Make prediction
-            predicted_output = model.predict(combined_input)
-            predicted_id = np.argmax(predicted_output, axis=-1).flatten()[0]
-            predicted_output_ids.append(predicted_id)
-            preprocessed_input = np.append(preprocessed_input, [[predicted_id]], axis=1)
-
-        predicted_output = decode_output(predicted_output_ids)
-        results.append(f"Input: {input_seq}, Predicted Output: {predicted_output}, Expected Output: {expected_output}")
-
-        if predicted_output == expected_output:
-            correct_predictions += 1
-
-    accuracy = correct_predictions / len(test_data)
     return accuracy
 
 # テストデータのロード
-test_data = load_dataset(test_data_path)
+test_data = load_preprocessed_dataset(preprocessed_test_data_path)
 
 # モデルの評価
 accuracy = evaluate_model(model, test_data)

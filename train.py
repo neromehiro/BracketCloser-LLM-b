@@ -1,4 +1,4 @@
-# 事前学習モデルのコード
+# train.py
 import os
 import sys
 import json
@@ -6,6 +6,7 @@ import numpy as np  # numpyをインポート
 from modules.data_utils import load_dataset, prepare_sequences, tokens, token2id
 from modules.model_utils import define_gru_model, define_transformer_model, define_lstm_model, define_bert_model, define_gpt_model
 from modules.training_utils import train_model, plot_training_history, save_metadata
+from modules.custom_layers import CustomMultiHeadAttention  # CustomMultiHeadAttentionをインポート
 
 # プロジェクトのルートディレクトリをPythonパスに追加
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -106,10 +107,11 @@ def select_mode_and_architecture():
     
     arch, mode = choice.split()
     architecture = SHORTCUTS[arch]
-    return MODEL_ARCHITECTURES[architecture], TRAINING_MODES[mode]
+    return MODEL_ARCHITECTURES[architecture], TRAINING_MODES[mode], architecture
+
 
 def main():
-    model_architecture_func, training_mode = select_mode_and_architecture()
+    model_architecture_func, training_mode, architecture = select_mode_and_architecture()
     epochs = training_mode["epochs"]
     batch_size = training_mode["batch_size"]
     num_files = training_mode["num_files"]
@@ -145,7 +147,7 @@ def main():
     model_path = f"{model_save_path}best_model.h5"
     plot_path = f"{model_save_path}training_history.png"
 
-    history, dataset_size = train_model(model, all_input_sequences, all_target_tokens, epochs=epochs, batch_size=batch_size, model_path=model_path, num_files=num_files, learning_rate=learning_rate)
+    history, dataset_size = train_model(model, all_input_sequences, all_target_tokens, epochs=epochs, batch_size=batch_size, model_path=model_path, num_files=num_files, learning_rate=learning_rate, architecture=architecture)
     
     if history:
         plot_training_history(history, save_path=plot_path, epochs=epochs, batch_size=batch_size, learning_rate=learning_rate, num_files=num_files, dataset_size=dataset_size)
