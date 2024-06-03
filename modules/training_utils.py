@@ -2,19 +2,35 @@
 
 import os
 import time
-import json  # jsonモジュールをインポート
+import json
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.keras.callbacks import Callback, ModelCheckpoint
 import numpy as np
+from datetime import datetime  # datetimeモジュールをインポート
 
 
 class TrainingHistory(tf.keras.callbacks.Callback):
+    def __init__(self, model_path):
+        super().__init__()
+        self.model_path = model_path
+
     def on_train_begin(self, logs={}):
         self.history = []
 
     def on_epoch_end(self, epoch, logs={}):
         self.history.append(logs.copy())
+        self.save_metadata(epoch, logs)
+
+    def save_metadata(self, epoch, logs):
+        metadata_path = self.model_path.replace('.h5', f'_epoch_{epoch + 1}_metadata.json')
+        metadata = {
+            "epoch": epoch + 1,
+            "logs": logs,
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        with open(metadata_path, 'w') as f:
+            json.dump(metadata, f, indent=4)
 
 class TimeHistory(Callback):
     def on_train_begin(self, logs={}):
@@ -67,8 +83,8 @@ def train_model(model, input_sequences, target_tokens, epochs, batch_size, model
         print("Debug: Target tokens shape:", target_tokens.shape)
 
         time_callback = TimeHistory()
-        checkpoint_callback = ModelCheckpoint(model_path, save_best_only=True, monitor='val_loss', mode='min', verbose=1)
-        history_callback = TrainingHistory()
+        checkpoint_callback = ModelCheckpoint(filepath=model_path, save_weights_only=False, save_best_only=False, save_freq='epoch', verbose=1)
+        history_callback = TrainingHistory(model_path)
 
         history = model.fit(train_dataset, epochs=epochs, validation_data=validation_dataset, callbacks=[time_callback, checkpoint_callback, history_callback])
 

@@ -2,11 +2,12 @@
 import os
 import sys
 import json
-import numpy as np  # numpyをインポート
+import numpy as np
+from datetime import datetime
 from modules.data_utils import load_dataset, prepare_sequences, tokens, token2id
 from modules.model_utils import define_gru_model, define_transformer_model, define_lstm_model, define_bert_model, define_gpt_model
 from modules.training_utils import train_model, plot_training_history, save_metadata
-from modules.custom_layers import CustomMultiHeadAttention  # CustomMultiHeadAttentionをインポート
+from modules.custom_layers import CustomMultiHeadAttention
 
 # プロジェクトのルートディレクトリをPythonパスに追加
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -163,7 +164,8 @@ def main():
         "dataset_size": dataset_size,
         "model_size_MB": model_size,
         "model_params": model_params,
-        "model_architecture": model_architecture_func.__name__
+        "model_architecture": model_architecture_func.__name__,
+        "training_end_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
     save_metadata(model_path, metadata)
 

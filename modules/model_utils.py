@@ -40,8 +40,15 @@ def define_transformer_model(seq_length, output_dim, learning_rate):
 
 def define_lstm_model(seq_length, output_dim, learning_rate):
     inputs = layers.Input(shape=(seq_length,))
-    x = layers.Embedding(input_dim=output_dim, output_dim=64, mask_zero=True)(inputs)
-    x = layers.LSTM(64, dropout=0.2, recurrent_dropout=0.2)(x)
+    x = layers.Embedding(input_dim=output_dim, output_dim=256, mask_zero=True)(inputs)
+    
+    # 最初のLSTM層
+    x = layers.LSTM(512, return_sequences=True, dropout=0.2, recurrent_dropout=0.2)(x)
+    # 中間のLSTM層
+    x = layers.LSTM(512, return_sequences=True, dropout=0.2, recurrent_dropout=0.2)(x)
+    # 最後のLSTM層
+    x = layers.LSTM(512, dropout=0.2, recurrent_dropout=0.2)(x)
+    
     outputs = layers.Dense(output_dim, activation="softmax", kernel_regularizer=tf.keras.regularizers.l2(0.01))(x)
 
     model = models.Model(inputs, outputs)
