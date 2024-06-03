@@ -8,6 +8,8 @@
 ・強化学習 (Reinforcement Learning)：エージェントが環境（括弧閉じタスク）とインタラクションしながら学習し、適切な括弧閉じを行うための最適なポリシーを見つける。
 ・データ拡張と正則化技術 (Data Augmentation and Regularization Techniques)：データセットに様々な変換を加えてデータの多様性を増し、ドロップアウトやL2正則化などを適用して過学習を防ぐ。
 
+・稲刈り手法や量子化など
+
 BracketCloser-LLM/
 │   ├── use_transformer.py
 │   ├── LICENSE
