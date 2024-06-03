@@ -2,9 +2,14 @@ import os
 import json
 import numpy as np
 import tensorflow as tf
+import logging
 from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import MultiHeadAttention
 from typing import List
+
+# ログ設定
+logging.basicConfig(filename='debug_log.txt', level=logging.DEBUG, 
+                    format='%(asctime)s %(levelname)s: %(message)s')
 
 # ディレクトリ設定
 dirs = {
@@ -37,6 +42,9 @@ class CustomMultiHeadAttention(MultiHeadAttention):
             attention_mask = tf.convert_to_tensor(attention_mask, dtype=tf.float32)
         return super().call(query, value, key=key, attention_mask=attention_mask, return_attention_scores=return_attention_scores, training=training)
 
+# モデルの種類を指定
+model_type = "gru"  # ここでモデルの種類を指定します
+
 # モデルのロード
 model = load_model(model_save_path, custom_objects={'CustomMultiHeadAttention': CustomMultiHeadAttention})
 
@@ -62,42 +70,62 @@ def tokenize_string(string: str) -> List[str]:
 
 def preprocess_input(input_seq: str) -> List[int]:
     tokens = tokenize_string(input_seq)
+    logging.debug(f"Tokenized string: {tokens}")  # デバッグ: トークン化された文字列をログに記録
     return [token2id[token] for token in tokens if token in token2id]
 
 def decode_output(output_seq: List[int]) -> str:
-    return "".join([id2token[id] for id in output_seq if id in id2token])
+    decoded = "".join([id2token[id] for id in output_seq if id in id2token])
+    logging.debug(f"Decoded output: {decoded}")  # デバッグ: デコードされた出力をログに記録
+    return decoded
 
-def evaluate_model(model, test_data: List[str]):
+def split_input_output(data):
+    input_output_pairs = []
+    for item in data:
+        input_seq = item.split(",output:")[0] + ",output"
+        output_seq = item.split(",output:")[1]
+        input_output_pairs.append((input_seq, output_seq))
+    return input_output_pairs
+
+def evaluate_model(model, test_data: List[str], model_type: str):
     correct_predictions = 0
     results = []
 
-    for idx, data in enumerate(test_data):
-        input_seq = data.split(",")[0].split(":")[1].strip()
-        expected_output = data.split(",")[1].split(":")[1].strip()
+    input_output_pairs = split_input_output(test_data)
 
+    for idx, (input_seq, expected_output) in enumerate(input_output_pairs):
         # Preprocessing
         preprocessed_input = preprocess_input(input_seq)
         preprocessed_input = np.array(preprocessed_input).reshape(1, -1)
+        
+        # デバッグ: 入力シーケンスの確認
+        logging.debug(f"Input with output token: {input_seq}")
+        logging.debug(f"Preprocessed input: {preprocessed_input}")
 
         expected_output_tokens = preprocess_input(expected_output)
+        logging.debug(f"Expected output tokens: {expected_output_tokens}")  # デバッグ: 期待される出力のトークンをログに記録
         
         # モデルに input と expected_output の最初の部分を与える
-        for token in expected_output_tokens[:len(preprocessed_input[0])]:
-            preprocessed_input = np.append(preprocessed_input, [[token]], axis=1)
-
         predicted_output_ids = []
-        for i in range(len(expected_output_tokens) - len(preprocessed_input[0])):
-            # Create attention_mask based on the current input length
-            attention_mask = np.ones((1, preprocessed_input.shape[1]), dtype=np.float32)
-
-            # Make prediction
-            predicted_output = model.predict([preprocessed_input, attention_mask])
+        for i in range(len(expected_output_tokens)):
+            if model_type in ["transformer", "bert", "gpt"]:
+                # Create attention_mask based on the current input length
+                attention_mask = np.ones((1, preprocessed_input.shape[1]), dtype=np.float32)
+                # デバッグ: マスクの確認
+                logging.debug(f"Attention mask: {attention_mask}")
+                predicted_output = model.predict([preprocessed_input, attention_mask])
+            else:
+                predicted_output = model.predict(preprocessed_input)
+                
+            logging.debug(f"Predicted output raw (step {i}): {predicted_output}")  # デバッグ: 予測結果の確認
             predicted_id = np.argmax(predicted_output, axis=-1).flatten()[0]
             predicted_output_ids.append(predicted_id)
             preprocessed_input = np.append(preprocessed_input, [[predicted_id]], axis=1)
 
+            # デバッグ: 予測結果の確認
+            logging.debug(f"Predicted ID (step {i}): {predicted_id}")
+
         predicted_output = decode_output(predicted_output_ids)
-        expected_output_reconstructed = decode_output(expected_output_tokens[len(preprocessed_input[0]):])
+        expected_output_reconstructed = decode_output(expected_output_tokens)
         
         if predicted_output == expected_output_reconstructed:
             results.append(f"問題{idx + 1} 正解\n入力した単語 Input: {input_seq}\n出力の単語: {predicted_output}\n正解の単語: {expected_output_reconstructed}\n")
@@ -118,6 +146,6 @@ def evaluate_model(model, test_data: List[str]):
 test_data = load_dataset(test_data_path)
 
 # モデルの評価
-accuracy = evaluate_model(model, test_data)
+accuracy = evaluate_model(model, test_data, model_type)
 print(f"モデルの精度: {accuracy * 100:.2f}%")
 print(f"評価結果は {evaluation_result_path} に保存されました。")

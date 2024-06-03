@@ -78,6 +78,7 @@ def define_bert_model(seq_length, output_dim, learning_rate):
     )
     return model
 
+
 def define_gpt_model(seq_length, output_dim, learning_rate):
     inputs = tf.keras.layers.Input(shape=(seq_length,), name='input_1')
     attention_mask = tf.keras.layers.Input(shape=(seq_length,), dtype=tf.float32, name='input_2')

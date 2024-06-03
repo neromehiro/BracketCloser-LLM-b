@@ -3,7 +3,7 @@ import json
 import numpy as np
 
 # トークンとIDの対応付け
-tokens = ["(", ")", "[", "]", "{", "}", "input", ",output", ","]
+tokens = ["(", ")", "【", "】", "{", "}", "input", ",output", ","]
 token2id = {token: i for i, token in enumerate(tokens)}
 
 def load_dataset(filepath):
