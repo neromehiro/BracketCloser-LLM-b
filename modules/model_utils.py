@@ -78,7 +78,6 @@ def define_bert_model(seq_length, output_dim, learning_rate):
     )
     return model
 
-
 def define_gpt_model(seq_length, output_dim, learning_rate):
     inputs = tf.keras.layers.Input(shape=(seq_length,), name='input_1')
     attention_mask = tf.keras.layers.Input(shape=(seq_length,), dtype=tf.float32, name='input_2')
@@ -104,14 +103,20 @@ def define_gpt_model(seq_length, output_dim, learning_rate):
     add_norm_layer2 = tf.keras.layers.Add()([norm_layer, ffn_output])
     norm_layer2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)(add_norm_layer2)
     
-    # Output Layer
-    outputs = tf.keras.layers.Dense(output_dim, activation='softmax')(norm_layer2)
+    # Global Average Pooling Layer
+    gap_layer = tf.keras.layers.GlobalAveragePooling1D()(norm_layer2)
+    
+    # 出力層
+    outputs = tf.keras.layers.Dense(output_dim, activation=None, dtype='float32')(gap_layer)
     
     # Create Model
     model = tf.keras.Model(inputs=[inputs, attention_mask], outputs=outputs)
     
+    # 出力形状を確認するデバッグログ
+    print("Debug: Model output shape after pooling:", outputs.shape)
+    
     # Compile Model
     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-    model.compile(optimizer=optimizer, loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer=optimizer, loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True), metrics=['accuracy'])
     
     return model

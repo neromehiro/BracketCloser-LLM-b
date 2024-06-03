@@ -38,20 +38,20 @@ def train_model(model, input_sequences, target_tokens, epochs, batch_size, model
             attention_mask = np.ones_like(input_sequences)
             train_dataset = tf.data.Dataset.from_tensor_slices(
                 ({'input_1': input_sequences[:-num_validation_samples], 'input_2': attention_mask[:-num_validation_samples]}, target_tokens[:-num_validation_samples])
-            )
+            ).batch(batch_size)
             validation_dataset = tf.data.Dataset.from_tensor_slices(
                 ({'input_1': input_sequences[-num_validation_samples:], 'input_2': attention_mask[-num_validation_samples:]}, target_tokens[-num_validation_samples:])
-            )
+            ).batch(batch_size)
         else:
             train_dataset = tf.data.Dataset.from_tensor_slices(
                 (input_sequences[:-num_validation_samples], target_tokens[:-num_validation_samples])
-            )
+            ).batch(batch_size)
             validation_dataset = tf.data.Dataset.from_tensor_slices(
                 (input_sequences[-num_validation_samples:], target_tokens[-num_validation_samples:])
-            )
+            ).batch(batch_size)
 
-        train_dataset = train_dataset.shuffle(buffer_size=1024).batch(batch_size)
-        validation_dataset = validation_dataset.batch(batch_size)
+        train_dataset = train_dataset.shuffle(buffer_size=1024)
+        validation_dataset = validation_dataset
 
         # データセットの形状を確認
         for data, labels in train_dataset.take(1):
@@ -61,6 +61,10 @@ def train_model(model, input_sequences, target_tokens, epochs, batch_size, model
             else:
                 print("Train data batch shape: ", data.shape)
             print("Train labels batch shape: ", labels.shape)
+
+        # デバッグログ追加: モデル出力の形状確認
+        print("Debug: Model output shape:", model.output.shape)
+        print("Debug: Target tokens shape:", target_tokens.shape)
 
         time_callback = TimeHistory()
         checkpoint_callback = ModelCheckpoint(model_path, save_best_only=True, monitor='val_loss', mode='min', verbose=1)

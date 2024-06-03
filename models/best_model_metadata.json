@@ -4,7 +4,7 @@
     "num_files": 5,
     "learning_rate": 0.01,
     "dataset_size": 127666,
-    "model_size_MB": 0.1177978515625,
-    "model_params": 26250,
-    "model_architecture": "define_gru_model"
+    "model_size_MB": 1.5592193603515625,
+    "model_params": 398474,
+    "model_architecture": "define_gpt_model"
 }
