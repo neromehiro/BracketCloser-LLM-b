@@ -3,8 +3,8 @@
     "batch_size": 128,
     "num_files": 5,
     "learning_rate": 0.01,
-    "dataset_size": 0,
-    "model_size_MB": 0.1496734619140625,
-    "model_params": 398474,
-    "model_architecture": "define_gpt_model"
+    "dataset_size": 128098,
+    "model_size_MB": 0.1177978515625,
+    "model_params": 26250,
+    "model_architecture": "define_gru_model"
 }

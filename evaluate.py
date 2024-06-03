@@ -25,14 +25,14 @@ dirs = {
 }
 
 # モデルの保存パス
-model_save_path = "./models/best_model.h5"
+model_save_path = "./models/best_model_tra.h5"
+model_metadata_path = "./models/best_model_metadata.json"
 
 # テストデータの保存パス
 test_data_path = os.path.join(dirs["original"], "test_bracket_dataset.json")
 
 # 評価結果の保存パス
 evaluation_result_path = "evaluation_result.txt"
-
 
 # トークンとIDを対応付ける辞書
 tokens = ["(", ")", "【", "】", "{", "}", "input", ",output", ","]
@@ -49,8 +49,25 @@ class CustomMultiHeadAttention(MultiHeadAttention):
             attention_mask = tf.convert_to_tensor(attention_mask, dtype=tf.float32)
         return super().call(query, value, key=key, attention_mask=attention_mask, return_attention_scores=return_attention_scores, training=training)
 
-# モデルの種類を指定
-model_type = "gru"  # ここでモデルの種類を指定します
+# モデルメタデータをロードしてモデルの種類を自動設定
+def get_model_type(metadata_path: str) -> str:
+    with open(metadata_path, "r", encoding="utf-8") as f:
+        metadata = json.load(f)
+    model_architecture = metadata.get("model_architecture", "")
+    if "gru" in model_architecture.lower():
+        return "gru"
+    elif "transformer" in model_architecture.lower():
+        return "transformer"
+    elif "lstm" in model_architecture.lower():
+        return "lstm"
+    elif "bert" in model_architecture.lower():
+        return "bert"
+    elif "gpt" in model_architecture.lower():
+        return "gpt"
+    else:
+        raise ValueError(f"Unknown model architecture: {model_architecture}")
+
+model_type = get_model_type(model_metadata_path)
 
 # モデルのロード
 model = load_model(model_save_path, custom_objects={'CustomMultiHeadAttention': CustomMultiHeadAttention})
@@ -119,7 +136,10 @@ def evaluate_model(model, test_data: List[str], model_type: str):
                 attention_mask = np.ones((1, preprocessed_input.shape[1]), dtype=np.float32)
                 # デバッグ: マスクの確認
                 logging.debug(f"Attention mask: {attention_mask}")
-                predicted_output = model.predict([preprocessed_input, attention_mask])
+
+                # これらのモデルの場合、model_inputはリスト形式で指定する必要があります
+                model_input = [preprocessed_input, attention_mask]
+                predicted_output = model.predict(model_input)
             else:
                 predicted_output = model.predict(preprocessed_input)
                 
