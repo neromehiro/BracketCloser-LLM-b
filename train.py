@@ -3,7 +3,7 @@ import sys
 import json
 import numpy as np  # numpyをインポート
 from modules.data_utils import load_dataset, prepare_sequences, tokens, token2id
-from modules.model_utils import define_gru_model, define_transformer_model
+from modules.model_utils import define_gru_model, define_transformer_model, define_lstm_model, define_bert_model, define_gpt_model
 from modules.training_utils import train_model, plot_training_history, save_metadata
 
 # プロジェクトのルートディレクトリをPythonパスに追加
@@ -16,8 +16,20 @@ model_save_path = "./models/"
 
 MODEL_ARCHITECTURES = {
     "gru": define_gru_model,
-    "transformer": define_transformer_model
+    "transformer": define_transformer_model,
+    "lstm": define_lstm_model,
+    "bert": define_bert_model,
+    "gpt": define_gpt_model
 }
+
+SHORTCUTS = {
+    "gru": "gru",
+    "tra": "transformer",
+    "lstm": "lstm",
+    "ber": "bert",
+    "gpt": "gpt"
+}
+
 
 TRAINING_MODES = {
     "1min": {"epochs": 1, "batch_size": 128, "num_files": 5, "learning_rate": 0.01},
@@ -39,7 +51,7 @@ def select_mode():
 
 def select_mode_and_architecture():
     modes = list(TRAINING_MODES.keys())
-    architectures = list(MODEL_ARCHITECTURES.keys())
+    architectures = list(SHORTCUTS.keys())
     choices = [f"{arch} {mode}" for arch in architectures for mode in modes]
 
     print("以下のモードとアーキテクチャから選んでください。選択肢は英語のまま入力してください：\n")
@@ -50,7 +62,19 @@ def select_mode_and_architecture():
 
     print("\n2. Transformer")
     for mode in modes:
-        print(f"    - {mode}: transformer {mode}")
+        print(f"    - {mode}: tra {mode}")
+
+    print("\n3. LSTM")
+    for mode in modes:
+        print(f"    - {mode}: lstm {mode}")
+
+    print("\n4. BERT")
+    for mode in modes:
+        print(f"    - {mode}: ber {mode}")
+
+    print("\n5. GPT")
+    for mode in modes:
+        print(f"    - {mode}: gpt {mode}")
 
     choice = input("\nあなたの選択: ")
     
@@ -63,12 +87,25 @@ def select_mode_and_architecture():
 
         print("\n2. Transformer")
         for mode in modes:
-            print(f"    - {mode}: transformer {mode}")
+            print(f"    - {mode}: tra {mode}")
+
+        print("\n3. LSTM")
+        for mode in modes:
+            print(f"    - {mode}: lstm {mode}")
+
+        print("\n4. BERT")
+        for mode in modes:
+            print(f"    - {mode}: ber {mode}")
+
+        print("\n5. GPT")
+        for mode in modes:
+            print(f"    - {mode}: gpt {mode}")
         
         choice = input("\nあなたの選択: ")
     
     arch, mode = choice.split()
-    return MODEL_ARCHITECTURES[arch], TRAINING_MODES[mode]
+    architecture = SHORTCUTS[arch]
+    return MODEL_ARCHITECTURES[architecture], TRAINING_MODES[mode]
 
 def main():
     model_architecture_func, training_mode = select_mode_and_architecture()

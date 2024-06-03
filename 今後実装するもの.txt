@@ -1,0 +1,9 @@
+・追加学習
+・LoRA
+・転移学習(Transfer Learning)
+・自己教師あり学習(Self-Supervised Learning)
+・再帰的ニューラルネットワーク (Recursive Neural Networks)
+・アテンション機構とトランスフォーマーモデル (Attention Mechanisms and Transformer Models)
+・強化学習 (Reinforcement Learning)
+・データ拡張と正則化技術 (Data Augmentation and Regularization Techniques)
+・ハイパーパラメータチューニング (Hyperparameter Tuning)
