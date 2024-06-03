@@ -1,10 +1,10 @@
 {
-    "epochs": 3,
-    "batch_size": 256,
-    "num_files": 10,
+    "epochs": 1,
+    "batch_size": 128,
+    "num_files": 5,
     "learning_rate": 0.01,
     "dataset_size": 127666,
-    "model_size_MB": 2.0692672729492188,
+    "model_size_MB": 2.0693740844726562,
     "model_params": 167690,
-    "model_architecture": "define_bert_model"
+    "model_architecture": "define_gpt_model"
 }

@@ -1,9 +1,38 @@
-・追加学習
-・LoRA
-・転移学習(Transfer Learning)
-・自己教師あり学習(Self-Supervised Learning)
-・再帰的ニューラルネットワーク (Recursive Neural Networks)
-・アテンション機構とトランスフォーマーモデル (Attention Mechanisms and Transformer Models)
-・強化学習 (Reinforcement Learning)
-・データ拡張と正則化技術 (Data Augmentation and Regularization Techniques)
-・ハイパーパラメータチューニング (Hyperparameter Tuning)
+・ハイパーパラメータチューニング (Hyperparameter Tuning)：学習率やバッチサイズなどの最適なハイパーパラメータを見つけ出し、モデルの性能を最大化する。
+・追加学習：基本的な括弧閉じのルールを学習したモデルに対して、異なるパターンや複雑なケースを追加で学習させることで、モデルの適応能力を向上させる
+・LoRA：モデルの特定のレイヤーを低ランク近似で適応させ、モデルのサイズを抑えながら性能を向上させる。
+・転移学習(Transfer Learning)：別の事前学習済みモデル（例えばGPT-2やBERT）を括弧閉じのタスクに適応させることで、事前学習の知識を活用し、より高速に高性能なモデルを構築する。
+・自己教師あり学習(Self-Supervised Learning)：入力データの一部をマスクし、そのマスクされた部分を予測するタスクを設定することで、モデルに自己教師あり学習を行わせる。これにより、ラベルのないデータでも効果的に学習できる。
+・再帰的ニューラルネットワーク (Recursive Neural Networks)：入力データをツリー構造としてモデル化し、再帰的に学習することで、階層的な関係を学習させる。
+・アテンション機構とトランスフォーマーモデル (Attention Mechanisms and Transformer Models)：アテンション機構を利用して、入力シーケンス全体の関係性を効果的に捉えながら学習する。トランスフォーマーモデルはこの機構を使用して高いパフォーマンスを発揮する。
+・強化学習 (Reinforcement Learning)：エージェントが環境（括弧閉じタスク）とインタラクションしながら学習し、適切な括弧閉じを行うための最適なポリシーを見つける。
+・データ拡張と正則化技術 (Data Augmentation and Regularization Techniques)：データセットに様々な変換を加えてデータの多様性を増し、ドロップアウトやL2正則化などを適用して過学習を防ぐ。
+
+BracketCloser-LLM/
+│   ├── use_transformer.py
+│   ├── LICENSE
+│   ├── 今後実装するもの.txt
+│   ├── README.md
+│   ├── dataset.py
+│   ├── train.py
+│   ├── evaluate.py
+│   ├── evaluation_result.txt
+│   ├── dataset/
+│   │   ├── original/
+│   │   │   ├── bracket_dataset.json
+│   │   │   ├── test_bracket_dataset.json
+│   │   ├── preprocessed/
+│   │   │   ├── bracket_dataset.json
+│   │   │   ├── test_bracket_dataset.json
+│   │   ├── tokenize/
+│   │   │   ├── bracket_dataset.json
+│   │   │   ├── test_bracket_dataset.json
+│   ├── models/
+│   │   ├── best_model_metadata.json
+│   │   ├── best_model.h5
+│   │   ├── training_history.png
+│   ├── modules/
+│   │   ├── model_utils.py
+│   │   ├── __init__.py
+│   │   ├── data_utils.py
+│   │   ├── training_utils.py

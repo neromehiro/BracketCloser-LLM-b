@@ -1,3 +1,4 @@
+# 事前学習モデルのコード
 import os
 import sys
 import json

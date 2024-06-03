@@ -77,10 +77,9 @@ def define_bert_model(seq_length, output_dim, learning_rate):
 
 
 def define_gpt_model(seq_length, output_dim, learning_rate):
-    # Note: Full GPT implementation requires pre-trained weights and tokenizer
     inputs = layers.Input(shape=(seq_length,))
     x = layers.Embedding(input_dim=output_dim, output_dim=64, mask_zero=True)(inputs)
-    
+
     # Simplified GPT Decoder
     for _ in range(2):  # 2 Decoder layers as an example
         causal_mask = tf.linalg.band_part(tf.ones((seq_length, seq_length)), -1, 0)

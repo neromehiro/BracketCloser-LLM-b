@@ -1,0 +1,17 @@
+
+pip installした後、Dockerイメージを更新(コミット)
+1
+docker commit my_temp_container deep-learning-coding:pytorch1.12.0_tensorflow2.9.1_optuna
+
+2
+docker stop my_temp_container
+docker rm my_temp_container
+
+3
+export PROJECT_DIR=$(pwd)
+docker run -it \
+  -v "${PROJECT_DIR}:/app/project" \
+  --workdir /app/project \
+  --tmpfs /tmp:rw,size=10g \
+  deep-learning-coding:pytorch1.12.0_tensorflow2.9.1_optuna \
+  bash

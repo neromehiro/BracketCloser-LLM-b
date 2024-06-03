@@ -1,10 +1,10 @@
-# python evaluate.py
 import os
 import json
 import numpy as np
+import tensorflow as tf
 from tensorflow.keras.models import load_model
+from tensorflow.keras.layers import MultiHeadAttention
 from typing import List
-
 
 # ディレクトリ設定
 dirs = {
@@ -28,7 +28,7 @@ token2id = {token: i for i, token in enumerate(tokens)}
 id2token = {i: token for token, i in token2id.items()}
 
 # モデルのロード
-model = load_model(model_save_path)
+model = load_model(model_save_path, custom_objects={'MultiHeadAttention': MultiHeadAttention})
 
 def load_dataset(filepath: str) -> List[str]:
     with open(filepath, "r", encoding="utf-8") as f:
@@ -65,31 +65,33 @@ def evaluate_model(model, test_data: List[str]):
         input_seq = data.split(",")[0].split(":")[1]
         expected_output = data.split(",")[1].split(":")[1]
 
-        # 前処理
+        # Preprocessing
         preprocessed_input = preprocess_input(input_seq)
-        preprocessed_input = np.array(preprocessed_input).reshape(1, -1)  # モデルの入力形状に合わせる
+        preprocessed_input = np.array(preprocessed_input).reshape(1, -1)
 
-        # モデルの予測をシーケンス全体に渡って行う
         predicted_output_ids = []
-        for _ in range(len(expected_output)):
-            predicted_output = model.predict(preprocessed_input)
-            predicted_id = np.argmax(predicted_output, axis=-1).flatten()[0]  # 予測結果をIDに変換
+        for i in range(len(expected_output)):
+            # Create attention_mask based on the current input length
+            attention_mask = np.zeros((1, preprocessed_input.shape[1]), dtype=np.float32)
+            attention_mask[:, :i+1] = 1.0
+
+            # Combine input and attention mask
+            combined_input = np.concatenate([preprocessed_input, attention_mask], axis=-1)
+
+            # Log output shapes
+            print(f"combined_input shape: {combined_input.shape}")
+
+            # Make prediction
+            predicted_output = model.predict(combined_input)
+            predicted_id = np.argmax(predicted_output, axis=-1).flatten()[0]
             predicted_output_ids.append(predicted_id)
             preprocessed_input = np.append(preprocessed_input, [[predicted_id]], axis=1)
 
-        # デコード
         predicted_output = decode_output(predicted_output_ids)
-
-        # 結果の保存
         results.append(f"Input: {input_seq}, Predicted Output: {predicted_output}, Expected Output: {expected_output}")
-        
+
         if predicted_output == expected_output:
             correct_predictions += 1
-
-    # 結果のファイル保存
-    with open(evaluation_result_path, "w", encoding="utf-8") as f:
-        for result in results:
-            f.write(result + "\n")
 
     accuracy = correct_predictions / len(test_data)
     return accuracy
