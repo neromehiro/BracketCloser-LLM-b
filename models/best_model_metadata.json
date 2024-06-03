@@ -1,7 +1,7 @@
 {
-    "epochs": 1,
-    "batch_size": 128,
-    "num_files": 5,
+    "epochs": 3,
+    "batch_size": 256,
+    "num_files": 10,
     "learning_rate": 0.01,
     "dataset_size": 127666,
     "model_size_MB": 0.33425140380859375,
