@@ -152,7 +152,7 @@ def generate_brackets(n_samples: int, max_depth: int, min_len: int, max_len: int
     
     return dataset
 
-num_samples = 10000  # データセットのサンプル数
+num_samples = 100000  # データセットのサンプル数
 max_depth = 5  # 括弧の最大深さ
 min_len = 5  # シーケンスの最小長
 max_len = 20  # シーケンスの最大長

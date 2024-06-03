@@ -25,7 +25,7 @@ dirs = {
 }
 
 # モデルの保存パス
-model_save_path = "./models/best_model_tra.h5"
+model_save_path = "./models/best_model.h5"
 model_metadata_path = "./models/best_model_metadata.json"
 
 # テストデータの保存パス

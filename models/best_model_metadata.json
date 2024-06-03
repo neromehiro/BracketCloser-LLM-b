@@ -1,10 +1,10 @@
 {
-    "epochs": 1,
-    "batch_size": 128,
-    "num_files": 5,
-    "learning_rate": 0.01,
-    "dataset_size": 128098,
-    "model_size_MB": 0.1177978515625,
-    "model_params": 26250,
-    "model_architecture": "define_gru_model"
+    "epochs": 160,
+    "batch_size": 1024,
+    "num_files": 2400,
+    "learning_rate": 0.0005,
+    "dataset_size": 128084,
+    "model_size_MB": 0.1496734619140625,
+    "model_params": 34314,
+    "model_architecture": "define_lstm_model"
 }
