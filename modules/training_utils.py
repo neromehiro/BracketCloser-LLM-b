@@ -11,9 +11,10 @@ from datetime import datetime  # datetimeモジュールをインポート
 
 
 class TrainingHistory(tf.keras.callbacks.Callback):
-    def __init__(self, model_path):
+    def __init__(self, model_path, model_architecture_func):
         super().__init__()
         self.model_path = model_path
+        self.model_architecture_func = model_architecture_func
 
     def on_train_begin(self, logs={}):
         self.history = []
@@ -27,7 +28,8 @@ class TrainingHistory(tf.keras.callbacks.Callback):
         metadata = {
             "epoch": epoch + 1,
             "logs": logs,
-            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "model_architecture": self.model_architecture_func.__name__
         }
         with open(metadata_path, 'w') as f:
             json.dump(metadata, f, indent=4)
@@ -43,7 +45,7 @@ class TimeHistory(Callback):
         self.times.append(time.time() - self.epoch_time_start)
 
 
-def train_model(model, input_sequences, target_tokens, epochs, batch_size, model_path, num_files, learning_rate, architecture):
+def train_model(model, input_sequences, target_tokens, epochs, batch_size, model_path, num_files, learning_rate, architecture, model_architecture_func):
     if len(input_sequences) > 0 and len(target_tokens) > 0:
         print(f"Shapes: {input_sequences.shape}, {target_tokens.shape}")
 
@@ -84,7 +86,7 @@ def train_model(model, input_sequences, target_tokens, epochs, batch_size, model
 
         time_callback = TimeHistory()
         checkpoint_callback = ModelCheckpoint(filepath=model_path, save_weights_only=False, save_best_only=False, save_freq='epoch', verbose=1)
-        history_callback = TrainingHistory(model_path)
+        history_callback = TrainingHistory(model_path, model_architecture_func)
 
         history = model.fit(train_dataset, epochs=epochs, validation_data=validation_dataset, callbacks=[time_callback, checkpoint_callback, history_callback])
 
@@ -94,6 +96,8 @@ def train_model(model, input_sequences, target_tokens, epochs, batch_size, model
     else:
         print("No data for training.")
         return None, 0
+
+
 
 def plot_training_history(history, save_path, epochs, batch_size, learning_rate, num_files, dataset_size):
     losses = [epoch_logs['loss'] for epoch_logs in history]

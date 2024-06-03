@@ -148,7 +148,7 @@ def main():
     model_path = f"{model_save_path}best_model.h5"
     plot_path = f"{model_save_path}training_history.png"
 
-    history, dataset_size = train_model(model, all_input_sequences, all_target_tokens, epochs=epochs, batch_size=batch_size, model_path=model_path, num_files=num_files, learning_rate=learning_rate, architecture=architecture)
+    history, dataset_size = train_model(model, all_input_sequences, all_target_tokens, epochs=epochs, batch_size=batch_size, model_path=model_path, num_files=num_files, learning_rate=learning_rate, architecture=architecture, model_architecture_func=model_architecture_func)
     
     if history:
         plot_training_history(history, save_path=plot_path, epochs=epochs, batch_size=batch_size, learning_rate=learning_rate, num_files=num_files, dataset_size=dataset_size)

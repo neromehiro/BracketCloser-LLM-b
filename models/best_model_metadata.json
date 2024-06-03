@@ -7,5 +7,5 @@
     "model_size_MB": 0.1177978515625,
     "model_params": 26250,
     "model_architecture": "define_gru_model",
-    "training_end_time": "2024-06-03 16:08:02"
+    "training_end_time": "2024-06-03 16:22:11"
 }
