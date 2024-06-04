@@ -80,11 +80,11 @@ def define_bert_model(seq_length, output_dim, learning_rate, embedding_dim=64, n
 
 
 def define_gpt_model(seq_length, output_dim, learning_rate, embedding_dim=64, num_heads=8, ffn_units=2048, dropout_rate=0.1):
-    inputs = tf.keras.layers.Input(shape=(seq_length,), name='input_1')
-    attention_mask = tf.keras.layers.Input(shape=(seq_length,), dtype=tf.float32, name='input_2')
+    inputs = tf.keras.layers.Input(shape=(seq_length,), name='input_1')  # ここでshapeを(seq_length,)に修正
+    attention_mask = tf.keras.layers.Input(shape=(seq_length,), dtype=tf.float32, name='input_2')  # 同様に修正
 
     embedding_layer = tf.keras.layers.Embedding(input_dim=output_dim, output_dim=embedding_dim)(inputs)
-    attention_layer = tf.keras.layers.MultiHeadAttention(num_heads=num_heads, key_dim=embedding_dim)(embedding_layer, embedding_layer, attention_mask=attention_mask)
+    attention_layer = CustomMultiHeadAttention(num_heads=num_heads, key_dim=embedding_dim)(embedding_layer, embedding_layer, attention_mask=attention_mask)
     add_norm_layer = tf.keras.layers.Add()([embedding_layer, attention_layer])
     norm_layer = tf.keras.layers.LayerNormalization(epsilon=1e-6)(add_norm_layer)
     ffn = tf.keras.Sequential([
@@ -99,6 +99,10 @@ def define_gpt_model(seq_length, output_dim, learning_rate, embedding_dim=64, nu
 
     model = tf.keras.Model(inputs=[inputs, attention_mask], outputs=outputs)
     
+    # 出力形状を確認するデバッグログ
+    print("Debug: Model output shape after pooling:", outputs.shape)
+    
+    # Compile Model
     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
     model.compile(optimizer=optimizer, loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False), metrics=['accuracy'])
     

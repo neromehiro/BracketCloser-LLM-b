@@ -52,6 +52,7 @@ class TimeHistory(Callback):
         self.times.append(time.time() - self.epoch_time_start)
 
 
+
 def train_model(model, input_sequences, target_tokens, epochs, batch_size, model_path, num_files, learning_rate, architecture, model_architecture_func):
     if len(input_sequences) > 0 and len(target_tokens) > 0:
         print(f"Shapes: {input_sequences.shape}, {target_tokens.shape}")
@@ -59,27 +60,32 @@ def train_model(model, input_sequences, target_tokens, epochs, batch_size, model
         validation_split = 0.2
         num_validation_samples = int(validation_split * len(input_sequences))
 
-        # モデルの期待するシーケンス長を取得
-        seq_length = input_sequences.shape[1]
-
         if 'transformer' in architecture or 'gpt' in architecture:
-            attention_mask = np.ones_like(input_sequences)
+            attention_mask = np.ones_like(input_sequences) 
+
             train_dataset = tf.data.Dataset.from_tensor_slices(
-                ({'input_1': input_sequences[:-num_validation_samples], 'input_2': attention_mask[:-num_validation_samples]}, target_tokens[:-num_validation_samples])
+                ({'input_1': input_sequences[:-num_validation_samples],
+                  'input_2': attention_mask[:-num_validation_samples]},
+                 target_tokens[:-num_validation_samples])
             ).batch(batch_size)
+
             validation_dataset = tf.data.Dataset.from_tensor_slices(
-                ({'input_1': input_sequences[-num_validation_samples:], 'input_2': attention_mask[-num_validation_samples:]}, target_tokens[-num_validation_samples:])
+                ({'input_1': input_sequences[-num_validation_samples:],
+                  'input_2': attention_mask[-num_validation_samples:]},
+                 target_tokens[-num_validation_samples:])
             ).batch(batch_size)
+
         else:
+            # 他のアーキテクチャの場合は、attention_maskは不要なのでそのままのデータセットを使う
             train_dataset = tf.data.Dataset.from_tensor_slices(
                 (input_sequences[:-num_validation_samples], target_tokens[:-num_validation_samples])
             ).batch(batch_size)
+
             validation_dataset = tf.data.Dataset.from_tensor_slices(
                 (input_sequences[-num_validation_samples:], target_tokens[-num_validation_samples:])
             ).batch(batch_size)
 
         train_dataset = train_dataset.shuffle(buffer_size=1024)
-        validation_dataset = validation_dataset
 
         # データセットの形状を確認
         for data, labels in train_dataset.take(1):
@@ -90,11 +96,6 @@ def train_model(model, input_sequences, target_tokens, epochs, batch_size, model
                 print("Train data batch shape: ", data.shape)
             print("Train labels batch shape: ", labels.shape)
 
-        # デバッグログ追加: モデル出力の形状確認
-        print("Debug: Model output shape:", model.output.shape)
-        print("Debug: Target tokens shape:", target_tokens.shape)
-
-        # W&Bの初期化
         wandb.init(project="bracket_closer_llm")
 
         time_callback = TimeHistory()
@@ -110,7 +111,6 @@ def train_model(model, input_sequences, target_tokens, epochs, batch_size, model
     else:
         print("No data for training.")
         return None, 0
-
 
 def plot_training_history(history, save_path, epochs, batch_size, learning_rate, num_files, dataset_size):
     losses = [epoch_logs['loss'] for epoch_logs in history]

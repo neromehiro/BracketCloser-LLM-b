@@ -9,6 +9,7 @@ from modules.data_utils import load_dataset, prepare_sequences, tokens, token2id
 from modules.model_utils import define_gru_model, define_transformer_model, define_lstm_model, define_bert_model, define_gpt_model
 from modules.training_utils import train_model, plot_training_history, save_metadata
 from modules.custom_layers import CustomMultiHeadAttention
+from tensorflow.keras.preprocessing.sequence import pad_sequences 
 
 # 日本時間のタイムゾーンを設定
 japan_timezone = pytz.timezone("Asia/Tokyo")
@@ -58,6 +59,29 @@ def select_mode():
         print(f"Invalid mode. Please select a mode from: {', '.join(TRAINING_MODES.keys())}")
         mode = input()
     return TRAINING_MODES[mode]["epochs"], TRAINING_MODES[mode]["batch_size"], TRAINING_MODES[mode]["num_files"], TRAINING_MODES[mode]["learning_rate"]
+
+def prepare_sequences(encoded_tokens, seq_length):
+    input_sequences = []
+    target_tokens = []
+    
+    # エンコードされたトークンを用いてシーケンスを作成
+    for i in range(1, len(encoded_tokens)):
+        input_seq = encoded_tokens[:i]
+        target_seq = encoded_tokens[i]
+        input_sequences.append(input_seq)
+        target_tokens.append(target_seq)
+    
+    # シーケンスの長さを揃えるためにパディングを追加
+    input_sequences = pad_sequences(input_sequences, maxlen=seq_length, padding='post', value=token2id[","])
+    target_tokens = pad_sequences([target_tokens], maxlen=len(input_sequences), padding='post', value=token2id[","])[0]
+
+    return input_sequences, target_tokens
+
+def load_dataset(file_path):
+    with open(file_path, 'r') as file:
+        data = json.load(file)
+    return data
+
 
 def select_mode_and_architecture():
     modes = list(TRAINING_MODES.keys())
@@ -138,12 +162,13 @@ def main():
             encoded_tokens_list = load_dataset(file_path)
             for encoded_tokens in encoded_tokens_list:
                 num_datasets += 1
-                if len(encoded_tokens) > max_seq_length:
-                    input_sequences, target_tokens = prepare_sequences(encoded_tokens, seq_length=max_seq_length)
-                    all_input_sequences.extend(input_sequences)
-                    all_target_tokens.extend(target_tokens)
-                else:
-                    print(f"Not enough data in: {file_path}")
+                input_sequences, target_tokens = prepare_sequences(encoded_tokens, seq_length=max_seq_length)
+                all_input_sequences.extend(input_sequences)
+                all_target_tokens.extend(target_tokens)
+
+    if not all_input_sequences or not all_target_tokens:
+        print("No data for training.")
+        return
 
     vocab_size = len(vocab_set)
     model = model_architecture_func(max_seq_length, vocab_size + 1, learning_rate)

@@ -8,6 +8,7 @@ import logging
 from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import MultiHeadAttention
 from typing import List
+from tensorflow.keras.preprocessing.sequence import pad_sequences  # pad_sequencesをインポート
 
 # モジュールのパスを追加
 sys.path.append(os.path.join(os.path.dirname(__file__), 'modules'))
@@ -111,52 +112,56 @@ def split_input_output(data):
         input_output_pairs.append((input_seq, output_seq))
     return input_output_pairs
 
-def evaluate_model(model, test_data, model_type, max_seq_length):
+
+
+def evaluate_model(model, test_data, model_type):
     correct_predictions = 0
     results = []
+
+    # デフォルトの最大シーケンス長を設定
+    default_max_seq_length = 30
 
     input_output_pairs = split_input_output(test_data)
 
     for idx, (input_seq, expected_output) in enumerate(input_output_pairs):
         # Preprocessing
         preprocessed_input = preprocess_input(input_seq)
-        preprocessed_input = pad_sequences([preprocessed_input], maxlen=max_seq_length, padding='post', value=0)
-        
+
+        # 最大シーケンス長を修正: 常にdefault_max_seq_lengthにパディング
+        if len(preprocessed_input) > default_max_seq_length:
+            preprocessed_input = preprocessed_input[:default_max_seq_length]
+        else:
+            preprocessed_input = pad_sequences([preprocessed_input], maxlen=default_max_seq_length, padding='post', value=0)[0]
+
         # デバッグ: 入力シーケンスの確認
         logging.debug(f"Input with output token: {input_seq}")
         logging.debug(f"Preprocessed input: {preprocessed_input}")
 
         expected_output_tokens = preprocess_input(expected_output)
-        logging.debug(f"Expected output tokens: {expected_output_tokens}")  # デバッグ: 期待される出力のトークンをログに記録
-        
+        logging.debug(f"Expected output tokens: {expected_output_tokens}")
+
         # モデルに input と expected_output の最初の部分を与える
         predicted_output_ids = []
         for i in range(len(expected_output_tokens)):
             if model_type in ["transformer", "bert", "gpt"]:
-                # Create attention_mask based on the current input length
-                attention_mask = np.ones((1, preprocessed_input.shape[1]), dtype=np.float32)
-                # デバッグ: マスクの確認
-                logging.debug(f"Attention mask shape: {attention_mask.shape}")
-
-                # これらのモデルの場合、model_inputはリスト形式で指定する必要があります
-                model_input = [preprocessed_input, attention_mask]
+                attention_mask = np.ones((1, preprocessed_input.shape[0]), dtype=np.float32)  # attention_maskを修正
+                model_input = [np.expand_dims(preprocessed_input, axis=0), attention_mask]  # model_inputを修正
                 predicted_output = model.predict(model_input)
             else:
-                predicted_output = model.predict(preprocessed_input)
-                
-            logging.debug(f"Predicted output raw (step {i}): {predicted_output}")  # デバッグ: 予測結果の確認
+                model_input = np.expand_dims(preprocessed_input, axis=0)  # バッチ次元追加
+                predicted_output = model.predict(model_input)
+
+            logging.debug(f"Predicted output raw (step {i}): {predicted_output}")
             predicted_id = np.argmax(predicted_output, axis=-1).flatten()[0]
             predicted_output_ids.append(predicted_id)
-            preprocessed_input = np.append(preprocessed_input, [[predicted_id]], axis=1)
-            seq_length += 1  # 予測が追加されるためシーケンス長を更新
 
-            # デバッグ: 予測結果の確認
-            logging.debug(f"Predicted ID (step {i}): {predicted_id}")
-            logging.debug(f"Updated preprocessed input shape: {preprocessed_input.shape}")
+            # 入力シーケンスを更新して次の予測に使用 (train.pyのprepare_sequences関数を参考に修正)
+            preprocessed_input = np.roll(preprocessed_input, -1)  # 左に1つシフト
+            preprocessed_input[-1] = predicted_id  # 最後の要素を更新
 
         predicted_output = decode_output(predicted_output_ids)
         expected_output_reconstructed = decode_output(expected_output_tokens)
-        
+
         if predicted_output == expected_output_reconstructed:
             results.append(f"問題{idx + 1} 正解\n入力した単語 Input: {input_seq}\n出力の単語: {predicted_output}\n正解の単語: {expected_output_reconstructed}\n")
             correct_predictions += 1
@@ -171,6 +176,7 @@ def evaluate_model(model, test_data, model_type, max_seq_length):
         f.write(f"\nAccuracy: {accuracy * 100:.2f}%")
 
     return accuracy
+
 
 # テストデータのサンプル数
 num_test_samples = 100

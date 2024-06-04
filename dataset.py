@@ -55,7 +55,7 @@ def preprocess_and_save_dataset(dataset, filepath, max_seq_length=30):
     original_path = os.path.join(dirs["original"], filepath)
     try:
         with open(original_path, "w", encoding="utf-8") as f:
-            json.dump(dataset, f, ensure_ascii=False, indent=4)
+            f.write(json.dumps(dataset, ensure_ascii=False))
         print(f"{original_path} の保存に成功しました。")
     except Exception as e:
         print(f"{original_path} の保存に失敗しました。エラー: {e}")
@@ -65,7 +65,7 @@ def preprocess_and_save_dataset(dataset, filepath, max_seq_length=30):
     tokenize_path = os.path.join(dirs["tokenize"], filepath)
     try:
         with open(tokenize_path, "w", encoding="utf-8") as f:
-            json.dump(tokenized_dataset, f, ensure_ascii=False, indent=4)
+            f.write(json.dumps(tokenized_dataset, ensure_ascii=False))
         print(f"{tokenize_path} の保存に成功しました。")
     except Exception as e:
         print(f"{tokenize_path} の保存に失敗しました。エラー: {e}")
@@ -79,7 +79,7 @@ def preprocess_and_save_dataset(dataset, filepath, max_seq_length=30):
     preprocessed_path = os.path.join(dirs["preprocessed"], filepath)
     try:
         with open(preprocessed_path, "w", encoding="utf-8") as f:
-            json.dump(preprocessed_dataset, f, ensure_ascii=False, indent=4)
+            f.write(json.dumps(preprocessed_dataset, ensure_ascii=False))
         print(f"{preprocessed_path} の保存に成功しました。")
     except Exception as e:
         print(f"{preprocessed_path} の保存に失敗しました。エラー: {e}")
