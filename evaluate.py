@@ -118,15 +118,15 @@ def split_input_output(data):
 
 
 
-
-
 def evaluate_model(model, test_data, model_type):
     correct_predictions = 0
     results = []
 
-    # input_shapeをモデルから動的に取得
     input_shape = model.input_shape
-    max_seq_length = input_shape[1]
+    if isinstance(input_shape, list):
+        max_seq_length = input_shape[0][1]
+    else:
+        max_seq_length = input_shape[1]
 
     input_output_pairs = split_input_output(test_data)
 
@@ -135,11 +135,13 @@ def evaluate_model(model, test_data, model_type):
         preprocessed_input = preprocess_input(input_seq)
 
         # 入力をモデルの期待する形状にパディング
-        preprocessed_input = pad_sequences([preprocessed_input], maxlen=max_seq_length, padding='post', value=0)[0]
+        preprocessed_input_padded = pad_sequences(
+            [preprocessed_input], maxlen=max_seq_length, padding='post', value=0
+        )[0]
 
         # デバッグ: 入力シーケンスの確認
         logging.debug(f"Input with output token: {input_seq}")
-        logging.debug(f"Preprocessed input: {preprocessed_input}")
+        logging.debug(f"Preprocessed input: {preprocessed_input_padded}")
 
         expected_output_tokens = preprocess_input(expected_output)
         logging.debug(f"Expected output tokens: {expected_output_tokens}")
@@ -147,28 +149,26 @@ def evaluate_model(model, test_data, model_type):
         # モデルに input と expected_output の最初の部分を与える
         predicted_output_ids = []
         for i in range(len(expected_output_tokens)):
-            if model_type in ["transformer", "bert", "gpt"]:
-                attention_mask = np.ones((1, preprocessed_input.shape[0]), dtype=np.float32)  # attention_maskを修正
-                model_input = [np.expand_dims(preprocessed_input, axis=0), attention_mask]  # model_inputを修正
+            # モデルが複数の入力を期待しているか確認
+            if isinstance(model.input, list):
+                model_inputs = [np.array([preprocessed_input_padded]), np.array([preprocessed_input_padded])]
             else:
-                model_input = np.expand_dims(preprocessed_input, axis=0)  # バッチ次元追加
-            
-            # 次のトークンを予測
-            predicted_output = model.predict(model_input)
-            logging.debug(f"Predicted output raw shape (step {i}): {predicted_output.shape}")  # 予測出力の形状をログに記録
-            logging.debug(f"Predicted output raw (step {i}): {predicted_output}")
+                model_inputs = np.array([preprocessed_input_padded])
 
-            # 出力の形状が (1, 10) であるため、予測トークンIDを取得
-            predicted_id = np.argmax(predicted_output, axis=-1)[0]  # 最初のバッチのみ
-
+            # Predict
+            predicted_output = model.predict(model_inputs)
+            predicted_id = np.argmax(predicted_output[0], axis=-1)
             predicted_output_ids.append(predicted_id)
 
+            # デバッグ: 予測された出力を確認
+            logging.debug(f"Predicted token id: {predicted_id}")
+
             # 入力シーケンスを更新して次の予測に使用
-            if len(preprocessed_input) < max_seq_length:
-                preprocessed_input = np.concatenate([preprocessed_input, [predicted_id]])  # 末尾に要素を追加
+            if len(preprocessed_input_padded) < max_seq_length:
+                preprocessed_input_padded = np.concatenate([preprocessed_input_padded, [predicted_id]])  # 末尾に要素を追加
             else:
-                preprocessed_input = np.roll(preprocessed_input, -1)  # 左に1つシフト
-                preprocessed_input[-1] = predicted_id  # 最後の要素を更新
+                preprocessed_input_padded = np.roll(preprocessed_input_padded, -1)  # 左に1つシフト
+                preprocessed_input_padded[-1] = predicted_id  # 最後の要素を更新
 
         predicted_output = decode_output(predicted_output_ids)
         expected_output_reconstructed = decode_output(expected_output_tokens)
@@ -179,7 +179,6 @@ def evaluate_model(model, test_data, model_type):
         else:
             results.append(f"問題{idx + 1} 不正解\n入力した単語 Input: {input_seq}\n出力の単語: {predicted_output}\n正解の単語: {expected_output_reconstructed}\n")
 
-    accuracy = correct_predictions / len(test_data)
     accurate_percentage = correct_predictions / len(input_output_pairs) * 100
 
     # 結果をファイルに保存
@@ -187,7 +186,9 @@ def evaluate_model(model, test_data, model_type):
         f.write("\n".join(results))
         f.write(f"\nAccuracy: {accurate_percentage:.2f}%")
 
+    # 結果を戻り値として返す
     return accurate_percentage
+
 
 # テストデータのサンプル数
 num_test_samples = 100
@@ -196,8 +197,8 @@ num_test_samples = 100
 test_dataset = data_generator.generate_test_data(num_test_samples)
 
 # テストデータの前処理と保存
-data_generator.preprocess_and_save_dataset(test_dataset, "test_bracket_dataset.json")
-print("テストデータセットが保存された場所:", data_generator.dirs["original"] + "/test_bracket_dataset.json")
+data_generator.preprocess_and_save_dataset(test_dataset, test_data_path)
+print("テストデータセットが保存された場所:", test_data_path)
 
 # テストデータのロード
 test_data = load_dataset(test_data_path)

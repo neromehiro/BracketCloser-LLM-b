@@ -74,7 +74,7 @@ def preprocess_and_save_dataset(dataset, filepath, max_seq_length=30):
     preprocessed_dataset = [[token2id[token] for token in data if token in token2id] for data in tokenized_dataset]
 
     # パディング
-    preprocessed_dataset = pad_sequences(preprocessed_dataset, maxlen=max_seq_length, padding='post', value=0).tolist()
+    preprocessed_dataset = pad_sequences(preprocessed_dataset, maxlen=max_seq_length, padding='post', value=-1).tolist()
 
     preprocessed_path = os.path.join(dirs["preprocessed"], filepath)
     try:

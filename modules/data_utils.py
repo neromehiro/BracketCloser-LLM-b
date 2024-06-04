@@ -1,3 +1,4 @@
+# modules/data_utils.py
 import os
 import json
 import numpy as np
@@ -14,6 +15,13 @@ def prepare_sequences(encoded_tokens, seq_length):
     input_sequences = []
     target_tokens = []
     for i in range(len(encoded_tokens) - seq_length):
-        input_sequences.append(encoded_tokens[i:i+seq_length])
-        target_tokens.append(encoded_tokens[i+seq_length])
+        input_sequences.append(encoded_tokens[i : i + seq_length])
+
+        # ターゲットトークンとして、入力シーケンスの後に続く全ての括弧を含める
+        j = i + seq_length
+        while j < len(encoded_tokens) and encoded_tokens[j] in [1, 3, 5]:  # 1, 3, 5 は閉じ括弧のトークンID
+            target_tokens.append(encoded_tokens[j])
+            j += 1
+
     return np.array(input_sequences), np.array(target_tokens)
+

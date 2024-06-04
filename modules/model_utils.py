@@ -95,7 +95,7 @@ def define_gpt_model(seq_length, output_dim, learning_rate, embedding_dim=64, nu
     add_norm_layer2 = tf.keras.layers.Add()([norm_layer, ffn_output])
     norm_layer2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)(add_norm_layer2)
     gap_layer = tf.keras.layers.GlobalAveragePooling1D()(norm_layer2)
-    outputs = tf.keras.layers.Dense(output_dim, activation="softmax")(gap_layer)
+    outputs = tf.keras.layers.Dense(output_dim, activation="linear")(gap_layer)
 
     model = tf.keras.Model(inputs=[inputs, attention_mask], outputs=outputs)
     
