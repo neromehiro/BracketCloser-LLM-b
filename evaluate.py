@@ -1,3 +1,4 @@
+# evaluate.py
 import sys
 import os
 import json
@@ -110,7 +111,7 @@ def split_input_output(data):
         input_output_pairs.append((input_seq, output_seq))
     return input_output_pairs
 
-def evaluate_model(model, test_data: List[str], model_type: str):
+def evaluate_model(model, test_data, model_type, max_seq_length):
     correct_predictions = 0
     results = []
 
@@ -119,7 +120,7 @@ def evaluate_model(model, test_data: List[str], model_type: str):
     for idx, (input_seq, expected_output) in enumerate(input_output_pairs):
         # Preprocessing
         preprocessed_input = preprocess_input(input_seq)
-        preprocessed_input = np.array(preprocessed_input).reshape(1, -1)
+        preprocessed_input = pad_sequences([preprocessed_input], maxlen=max_seq_length, padding='post', value=0)
         
         # デバッグ: 入力シーケンスの確認
         logging.debug(f"Input with output token: {input_seq}")
@@ -135,7 +136,7 @@ def evaluate_model(model, test_data: List[str], model_type: str):
                 # Create attention_mask based on the current input length
                 attention_mask = np.ones((1, preprocessed_input.shape[1]), dtype=np.float32)
                 # デバッグ: マスクの確認
-                logging.debug(f"Attention mask: {attention_mask}")
+                logging.debug(f"Attention mask shape: {attention_mask.shape}")
 
                 # これらのモデルの場合、model_inputはリスト形式で指定する必要があります
                 model_input = [preprocessed_input, attention_mask]
@@ -147,9 +148,11 @@ def evaluate_model(model, test_data: List[str], model_type: str):
             predicted_id = np.argmax(predicted_output, axis=-1).flatten()[0]
             predicted_output_ids.append(predicted_id)
             preprocessed_input = np.append(preprocessed_input, [[predicted_id]], axis=1)
+            seq_length += 1  # 予測が追加されるためシーケンス長を更新
 
             # デバッグ: 予測結果の確認
             logging.debug(f"Predicted ID (step {i}): {predicted_id}")
+            logging.debug(f"Updated preprocessed input shape: {preprocessed_input.shape}")
 
         predicted_output = decode_output(predicted_output_ids)
         expected_output_reconstructed = decode_output(expected_output_tokens)

@@ -123,7 +123,7 @@ def main():
     batch_size = training_mode["batch_size"]
     num_files = training_mode["num_files"]
     learning_rate = training_mode["learning_rate"]
-    seq_length = 1
+    max_seq_length = 30  # 最大シーケンス長を設定
 
     vocab_set = set(tokens)
 
@@ -138,15 +138,15 @@ def main():
             encoded_tokens_list = load_dataset(file_path)
             for encoded_tokens in encoded_tokens_list:
                 num_datasets += 1
-                if len(encoded_tokens) > seq_length:
-                    input_sequences, target_tokens = prepare_sequences(encoded_tokens, seq_length=seq_length)
+                if len(encoded_tokens) > max_seq_length:
+                    input_sequences, target_tokens = prepare_sequences(encoded_tokens, seq_length=max_seq_length)
                     all_input_sequences.extend(input_sequences)
                     all_target_tokens.extend(target_tokens)
                 else:
                     print(f"Not enough data in: {file_path}")
 
     vocab_size = len(vocab_set)
-    model = model_architecture_func(seq_length, vocab_size + 1, learning_rate)
+    model = model_architecture_func(max_seq_length, vocab_size + 1, learning_rate)
 
     all_input_sequences = np.array(all_input_sequences)
     all_target_tokens = np.array(all_target_tokens)
@@ -168,10 +168,29 @@ def main():
     plot_path = os.path.join(temp_save_dir, "training_history.png")
 
     # モデルの学習
-    history, dataset_size = train_model(model, all_input_sequences, all_target_tokens, epochs=epochs, batch_size=batch_size, model_path=model_path, num_files=num_files, learning_rate=learning_rate, architecture=architecture, model_architecture_func=model_architecture_func)
+    history, dataset_size = train_model(
+        model, 
+        all_input_sequences, 
+        all_target_tokens, 
+        epochs=epochs, 
+        batch_size=batch_size, 
+        model_path=model_path, 
+        num_files=num_files, 
+        learning_rate=learning_rate, 
+        architecture=architecture, 
+        model_architecture_func=model_architecture_func
+    )
     
     if history:
-        plot_training_history(history, save_path=plot_path, epochs=epochs, batch_size=batch_size, learning_rate=learning_rate, num_files=num_files, dataset_size=dataset_size)
+        plot_training_history(
+            history, 
+            save_path=plot_path, 
+            epochs=epochs, 
+            batch_size=batch_size, 
+            learning_rate=learning_rate, 
+            num_files=num_files, 
+            dataset_size=dataset_size
+        )
 
     end_time = datetime.now(japan_timezone)
     training_duration = (end_time - start_time).total_seconds() / 60  # 分単位に変換

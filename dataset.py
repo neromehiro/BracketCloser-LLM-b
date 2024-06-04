@@ -2,6 +2,7 @@ import os
 import json
 import random
 from typing import List, Tuple
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 # 括弧の種類とキーワード
 tokens = ["(", ")", "【", "】", "{", "}", "input", ",output", ","]
@@ -26,6 +27,8 @@ def ensure_dir(directory):
         if not os.path.exists(directory):
             os.makedirs(directory)
             print(f"ディレクトリ {directory} を作成しました。")
+        else:
+            print(f"ディレクトリ {directory} は既に存在します。")
     except Exception as e:
         print(f"ディレクトリ {directory} の作成に失敗しました。エラー: {e}")
 
@@ -44,7 +47,7 @@ def tokenize_string(string: str) -> List[str]:
         tokens.append(current_token)
     return tokens
 
-def preprocess_and_save_dataset(dataset, filepath):
+def preprocess_and_save_dataset(dataset, filepath, max_seq_length=30):
     for directory in dirs.values():
         ensure_dir(directory)
 
@@ -52,7 +55,7 @@ def preprocess_and_save_dataset(dataset, filepath):
     original_path = os.path.join(dirs["original"], filepath)
     try:
         with open(original_path, "w", encoding="utf-8") as f:
-            json.dump(dataset, f, ensure_ascii=False)
+            json.dump(dataset, f, ensure_ascii=False, indent=4)
         print(f"{original_path} の保存に成功しました。")
     except Exception as e:
         print(f"{original_path} の保存に失敗しました。エラー: {e}")
@@ -62,17 +65,21 @@ def preprocess_and_save_dataset(dataset, filepath):
     tokenize_path = os.path.join(dirs["tokenize"], filepath)
     try:
         with open(tokenize_path, "w", encoding="utf-8") as f:
-            json.dump(tokenized_dataset, f, ensure_ascii=False)
+            json.dump(tokenized_dataset, f, ensure_ascii=False, indent=4)
         print(f"{tokenize_path} の保存に成功しました。")
     except Exception as e:
         print(f"{tokenize_path} の保存に失敗しました。エラー: {e}")
 
     # Preprocess dataset
     preprocessed_dataset = [[token2id[token] for token in data if token in token2id] for data in tokenized_dataset]
+
+    # パディング
+    preprocessed_dataset = pad_sequences(preprocessed_dataset, maxlen=max_seq_length, padding='post', value=0).tolist()
+
     preprocessed_path = os.path.join(dirs["preprocessed"], filepath)
     try:
         with open(preprocessed_path, "w", encoding="utf-8") as f:
-            json.dump(preprocessed_dataset, f, ensure_ascii=False)
+            json.dump(preprocessed_dataset, f, ensure_ascii=False, indent=4)
         print(f"{preprocessed_path} の保存に成功しました。")
     except Exception as e:
         print(f"{preprocessed_path} の保存に失敗しました。エラー: {e}")
@@ -152,7 +159,7 @@ def generate_brackets(n_samples: int, max_depth: int, min_len: int, max_len: int
     
     return dataset
 
-num_samples = 100000  # データセットのサンプル数
+num_samples = 1000  # データセットのサンプル数
 max_depth = 5  # 括弧の最大深さ
 min_len = 5  # シーケンスの最小長
 max_len = 20  # シーケンスの最大長
@@ -161,7 +168,7 @@ max_len = 20  # シーケンスの最大長
 dataset = generate_brackets(num_samples, max_depth, min_len, max_len)
 
 # データセットの前処理と保存
-preprocess_and_save_dataset(dataset, "bracket_dataset.json")
+preprocess_and_save_dataset(dataset, "bracket_dataset.json", max_seq_length=30)
 print("データセットが保存された場所:", os.path.join(dirs["original"], "bracket_dataset.json"))
 print("保存するデータセット:", dataset)
 
@@ -172,5 +179,5 @@ num_test_samples = 100
 test_dataset = generate_brackets(num_test_samples, max_depth, min_len, max_len)
 
 # テストデータの前処理と保存
-preprocess_and_save_dataset(test_dataset, "test_bracket_dataset.json")
+preprocess_and_save_dataset(test_dataset, "test_bracket_dataset.json", max_seq_length=30)
 print("テストデータセットが保存された場所:", os.path.join(dirs["original"], "test_bracket_dataset.json"))

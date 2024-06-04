@@ -1,10 +1,11 @@
 # modules/model_utils.py
+
 import tensorflow as tf
 from tensorflow.keras import layers, models
 from modules.custom_layers import CustomMultiHeadAttention
 
 
-def define_gru_model(seq_length, output_dim, embedding_dim=64, gru_units=64, dropout_rate=0.2, recurrent_dropout_rate=0.2, learning_rate=0.001):
+def define_gru_model(seq_length, output_dim, learning_rate, embedding_dim=64, gru_units=64, dropout_rate=0.2, recurrent_dropout_rate=0.2):
     inputs = layers.Input(shape=(seq_length,))
     x = layers.Embedding(input_dim=output_dim, output_dim=embedding_dim, mask_zero=True)(inputs)
     x = layers.GRU(gru_units, dropout=dropout_rate, recurrent_dropout=recurrent_dropout_rate)(x)
@@ -18,8 +19,7 @@ def define_gru_model(seq_length, output_dim, embedding_dim=64, gru_units=64, dro
     )
     return model
 
-
-def define_transformer_model(seq_length, output_dim, embedding_dim=64, num_heads=4, ffn_units=128, dropout_rate=0.1, learning_rate=0.001):
+def define_transformer_model(seq_length, output_dim, learning_rate, embedding_dim=64, num_heads=4, ffn_units=128, dropout_rate=0.1):
     inputs = layers.Input(shape=(seq_length,))
     x = layers.Embedding(input_dim=output_dim, output_dim=embedding_dim, mask_zero=True)(inputs)
     attention_output = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embedding_dim)(x, x)
@@ -40,7 +40,7 @@ def define_transformer_model(seq_length, output_dim, embedding_dim=64, num_heads
     return model
 
 
-def define_lstm_model(seq_length, output_dim, embedding_dim=256, lstm_units=512, dropout_rate=0.2, recurrent_dropout_rate=0.2, num_layers=3, learning_rate=0.001):
+def define_lstm_model(seq_length, output_dim, learning_rate, embedding_dim=256, lstm_units=512, dropout_rate=0.2, recurrent_dropout_rate=0.2, num_layers=3):
     inputs = layers.Input(shape=(seq_length,))
     x = layers.Embedding(input_dim=output_dim, output_dim=embedding_dim, mask_zero=True)(inputs)
     for _ in range(num_layers - 1):
@@ -57,7 +57,7 @@ def define_lstm_model(seq_length, output_dim, embedding_dim=256, lstm_units=512,
     return model
 
 
-def define_bert_model(seq_length, output_dim, embedding_dim=64, num_heads=4, ffn_units=128, num_layers=2, dropout_rate=0.1, learning_rate=0.001):
+def define_bert_model(seq_length, output_dim, learning_rate, embedding_dim=64, num_heads=4, ffn_units=128, num_layers=2, dropout_rate=0.1):
     inputs = layers.Input(shape=(seq_length,))
     x = layers.Embedding(input_dim=output_dim, output_dim=embedding_dim, mask_zero=True)(inputs)
     for _ in range(num_layers):
@@ -79,12 +79,12 @@ def define_bert_model(seq_length, output_dim, embedding_dim=64, num_heads=4, ffn
     return model
 
 
-def define_gpt_model(seq_length, output_dim, embedding_dim=64, num_heads=8, ffn_units=2048, dropout_rate=0.1, learning_rate=0.001):
+def define_gpt_model(seq_length, output_dim, learning_rate, embedding_dim=64, num_heads=8, ffn_units=2048, dropout_rate=0.1):
     inputs = tf.keras.layers.Input(shape=(seq_length,), name='input_1')
     attention_mask = tf.keras.layers.Input(shape=(seq_length,), dtype=tf.float32, name='input_2')
 
     embedding_layer = tf.keras.layers.Embedding(input_dim=output_dim, output_dim=embedding_dim)(inputs)
-    attention_layer = CustomMultiHeadAttention(num_heads=num_heads, key_dim=embedding_dim)(embedding_layer, embedding_layer, attention_mask=attention_mask)
+    attention_layer = tf.keras.layers.MultiHeadAttention(num_heads=num_heads, key_dim=embedding_dim)(embedding_layer, embedding_layer, attention_mask=attention_mask)
     add_norm_layer = tf.keras.layers.Add()([embedding_layer, attention_layer])
     norm_layer = tf.keras.layers.LayerNormalization(epsilon=1e-6)(add_norm_layer)
     ffn = tf.keras.Sequential([
@@ -98,47 +98,8 @@ def define_gpt_model(seq_length, output_dim, embedding_dim=64, num_heads=8, ffn_
     outputs = tf.keras.layers.Dense(output_dim, activation="softmax")(gap_layer)
 
     model = tf.keras.Model(inputs=[inputs, attention_mask], outputs=outputs)
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True), metrics=['accuracy'])
-    return model
-
-    inputs = tf.keras.layers.Input(shape=(seq_length,), name='input_1')
-    attention_mask = tf.keras.layers.Input(shape=(seq_length,), dtype=tf.float32, name='input_2')
-
-    # Embedding Layer
-    embedding_layer = tf.keras.layers.Embedding(input_dim=output_dim, output_dim=64)(inputs)
     
-    # Custom Multi-Head Attention Layer ここで、マスクを渡します
-    attention_layer = CustomMultiHeadAttention(num_heads=8, key_dim=64)(embedding_layer, embedding_layer, attention_mask=attention_mask)
-    
-    # Add & Norm層
-    add_norm_layer = tf.keras.layers.Add()([embedding_layer, attention_layer])
-    norm_layer = tf.keras.layers.LayerNormalization(epsilon=1e-6)(add_norm_layer)
-    
-    # Feed Forward Network
-    ffn = tf.keras.Sequential([
-        tf.keras.layers.Dense(2048, activation='relu'),
-        tf.keras.layers.Dense(64)
-    ])
-    ffn_output = ffn(norm_layer)
-    
-    # Add & Norm層
-    add_norm_layer2 = tf.keras.layers.Add()([norm_layer, ffn_output])
-    norm_layer2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)(add_norm_layer2)
-    
-    # Global Average Pooling Layer
-    gap_layer = tf.keras.layers.GlobalAveragePooling1D()(norm_layer2)
-    
-    # 出力層
-    outputs = tf.keras.layers.Dense(output_dim, activation=None, dtype='float32')(gap_layer)
-    
-    # Create Model
-    model = tf.keras.Model(inputs=[inputs, attention_mask], outputs=outputs)
-    
-    # 出力形状を確認するデバッグログ
-    print("Debug: Model output shape after pooling:", outputs.shape)
-    
-    # Compile Model
     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-    model.compile(optimizer=optimizer, loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True), metrics=['accuracy'])
+    model.compile(optimizer=optimizer, loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False), metrics=['accuracy'])
     
     return model

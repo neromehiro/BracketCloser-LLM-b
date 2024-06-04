@@ -2,6 +2,7 @@ import os
 import json
 import random
 from typing import List, Tuple
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 # 括弧の種類とキーワード
 tokens = ["(", ")", "【", "】", "{", "}", "input", ",output", ","]
@@ -44,7 +45,7 @@ def tokenize_string(string: str) -> List[str]:
         tokens.append(current_token)
     return tokens
 
-def preprocess_and_save_dataset(dataset, filepath):
+def preprocess_and_save_dataset(dataset, filepath, max_seq_length=30):
     for directory in dirs.values():
         ensure_dir(directory)
 
@@ -52,7 +53,7 @@ def preprocess_and_save_dataset(dataset, filepath):
     original_path = os.path.join(dirs["original"], filepath)
     try:
         with open(original_path, "w", encoding="utf-8") as f:
-            json.dump(dataset, f, ensure_ascii=False)
+            json.dump(dataset, f, ensure_ascii=False, indent=4)
         print(f"{original_path} の保存に成功しました。")
     except Exception as e:
         print(f"{original_path} の保存に失敗しました。エラー: {e}")
@@ -62,17 +63,21 @@ def preprocess_and_save_dataset(dataset, filepath):
     tokenize_path = os.path.join(dirs["tokenize"], filepath)
     try:
         with open(tokenize_path, "w", encoding="utf-8") as f:
-            json.dump(tokenized_dataset, f, ensure_ascii=False)
+            json.dump(tokenized_dataset, f, ensure_ascii=False, indent=4)
         print(f"{tokenize_path} の保存に成功しました。")
     except Exception as e:
         print(f"{tokenize_path} の保存に失敗しました。エラー: {e}")
 
     # Preprocess dataset
     preprocessed_dataset = [[token2id[token] for token in data if token in token2id] for data in tokenized_dataset]
+
+    # パディング
+    preprocessed_dataset = pad_sequences(preprocessed_dataset, maxlen=max_seq_length, padding='post', value=0).tolist()
+
     preprocessed_path = os.path.join(dirs["preprocessed"], filepath)
     try:
         with open(preprocessed_path, "w", encoding="utf-8") as f:
-            json.dump(preprocessed_dataset, f, ensure_ascii=False)
+            json.dump(preprocessed_dataset, f, ensure_ascii=False, indent=4)
         print(f"{preprocessed_path} の保存に成功しました。")
     except Exception as e:
         print(f"{preprocessed_path} の保存に失敗しました。エラー: {e}")
@@ -163,5 +168,5 @@ if __name__ == "__main__":
     test_dataset = generate_test_data(num_test_samples)
 
     # テストデータの前処理と保存
-    preprocess_and_save_dataset(test_dataset, "test_bracket_dataset.json")
+    preprocess_and_save_dataset(test_dataset, "test_bracket_dataset.json", max_seq_length=30)
     print("テストデータセットが保存された場所:", os.path.join(dirs["original"], "test_bracket_dataset.json"))

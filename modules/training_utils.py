@@ -59,6 +59,9 @@ def train_model(model, input_sequences, target_tokens, epochs, batch_size, model
         validation_split = 0.2
         num_validation_samples = int(validation_split * len(input_sequences))
 
+        # モデルの期待するシーケンス長を取得
+        seq_length = input_sequences.shape[1]
+
         if 'transformer' in architecture or 'gpt' in architecture:
             attention_mask = np.ones_like(input_sequences)
             train_dataset = tf.data.Dataset.from_tensor_slices(
@@ -107,7 +110,6 @@ def train_model(model, input_sequences, target_tokens, epochs, batch_size, model
     else:
         print("No data for training.")
         return None, 0
-
 
 
 def plot_training_history(history, save_path, epochs, batch_size, learning_rate, num_files, dataset_size):
