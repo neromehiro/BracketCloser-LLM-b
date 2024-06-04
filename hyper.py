@@ -56,7 +56,7 @@ def main():
 
     # トライアルの最適化
     try:
-        study.optimize(lambda trial: objective(trial, architecture, best_loss, encode_dir_path, lambda: create_save_folder(model_save_base_path, architecture)), timeout=time_limit.total_seconds(), callbacks=[callback])
+        study.optimize(lambda trial: objective(trial, architecture, best_loss, encode_dir_path, lambda: create_save_folder(model_save_base_path, architecture), trial.number), timeout=time_limit.total_seconds(), callbacks=[callback])
     except Exception as e:
         print(f"An exception occurred during optimization: {e}")
     finally:

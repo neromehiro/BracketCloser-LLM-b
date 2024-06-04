@@ -13,11 +13,15 @@ MODEL_ARCHITECTURES = {
     "gpt": define_gpt_model
 }
 
-def objective(trial, architecture, best_loss, encode_dir_path, create_save_folder):
+def objective(trial, architecture, best_loss, encode_dir_path, create_save_folder, trial_number):
     model_architecture_func = MODEL_ARCHITECTURES[architecture]
     
-    # ハイパーパラメータの範囲を設定
-    epochs = trial.suggest_int("epochs", 1, 100)
+    # 最初のトライアルの場合、エポック数を制限
+    if trial_number == 0:
+        epochs = trial.suggest_int("epochs", 5, 20)
+    else:
+        epochs = trial.suggest_int("epochs", 1, 100)
+    
     batch_size = trial.suggest_int("batch_size", 32, 1024)
     learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-1, log=True)
     seq_length = 1  # 固定値に設定
