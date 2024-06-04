@@ -8,6 +8,13 @@ import tensorflow as tf
 from tensorflow.keras.callbacks import Callback, ModelCheckpoint
 import numpy as np
 from datetime import datetime  # datetimeモジュールをインポート
+import wandb
+
+class WandbCallback(Callback):
+    def on_epoch_end(self, epoch, logs=None):
+        if logs is not None:
+            wandb.log(logs)
+
 
 
 class TrainingHistory(tf.keras.callbacks.Callback):
@@ -84,11 +91,15 @@ def train_model(model, input_sequences, target_tokens, epochs, batch_size, model
         print("Debug: Model output shape:", model.output.shape)
         print("Debug: Target tokens shape:", target_tokens.shape)
 
+        # W&Bの初期化
+        wandb.init(project="bracket_closer_llm")
+
         time_callback = TimeHistory()
         checkpoint_callback = ModelCheckpoint(filepath=model_path, save_weights_only=False, save_best_only=False, save_freq='epoch', verbose=1)
         history_callback = TrainingHistory(model_path, model_architecture_func)
+        wandb_callback = WandbCallback()
 
-        history = model.fit(train_dataset, epochs=epochs, validation_data=validation_dataset, callbacks=[time_callback, checkpoint_callback, history_callback])
+        history = model.fit(train_dataset, epochs=epochs, validation_data=validation_dataset, callbacks=[time_callback, checkpoint_callback, history_callback, wandb_callback])
 
         model.save(model_path, include_optimizer=False, save_format='h5')
         

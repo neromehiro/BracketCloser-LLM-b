@@ -1,8 +1,9 @@
+# hypre.py
 import optuna
 import sys
 import os
 import numpy as np
-import time
+import tensorflow as tf
 from datetime import datetime, timedelta
 from tqdm import tqdm
 from modules.data_utils import load_dataset, prepare_sequences, tokens
@@ -10,7 +11,7 @@ from modules.model_utils import define_gru_model, define_transformer_model, defi
 from modules.training_utils import train_model, plot_training_history, save_metadata
 
 # 訓練データのパス
-encode_dir_path = "./dataset/preprocessed/"
+encode_dir_path = "./components/dataset/preprocessed/"
 model_save_path = "./models/"
 study_name = "model_optimization_study"  # Study name for Optuna
 storage_name = "sqlite:///optuna_study.db"  # SQLite database for Optuna
@@ -56,14 +57,14 @@ def objective(trial):
     epochs = trial.suggest_int("epochs", 1, 100)
     batch_size = trial.suggest_int("batch_size", 32, 1024)
     learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-1, log=True)
-    seq_length = trial.suggest_int("seq_length", 1, 50)
+    seq_length = 1  # 固定値に設定
     
     vocab_set = set(tokens)
     all_input_sequences = []
     all_target_tokens = []
 
     num_datasets = 0
-    num_files = 5  # 最初は小さな数で固定
+    num_files = 10  # num_filesを増やす
 
     for dirpath, dirnames, filenames in os.walk(encode_dir_path):
         for file in filenames[:num_files]:
@@ -71,16 +72,22 @@ def objective(trial):
             encoded_tokens_list = load_dataset(file_path)
             for encoded_tokens in encoded_tokens_list:
                 num_datasets += 1
-                input_sequences, target_tokens = prepare_sequences(encoded_tokens, seq_length=seq_length)
-                all_input_sequences.extend(input_sequences)
-                all_target_tokens.extend(target_tokens)
+                if len(encoded_tokens) > seq_length:  # データ量が不十分な場合のチェックを追加
+                    input_sequences, target_tokens = prepare_sequences(encoded_tokens, seq_length=seq_length)
+                    all_input_sequences.extend(input_sequences)
+                    all_target_tokens.extend(target_tokens)
+                else:
+                    print(f"Not enough data in: {file_path}")
 
     if not all_input_sequences or not all_target_tokens:
         print("No data for training.")
         return float('inf')
 
     vocab_size = len(vocab_set)
-    model = model_architecture_func(seq_length, vocab_size + 1, learning_rate)
+    mirrored_strategy = tf.distribute.MirroredStrategy()  # 分散学習の設定を追加
+
+    with mirrored_strategy.scope():
+        model = model_architecture_func(seq_length, vocab_size + 1, learning_rate)
 
     all_input_sequences = np.array(all_input_sequences)
     all_target_tokens = np.array(all_target_tokens)
@@ -89,7 +96,18 @@ def objective(trial):
     temp_model_path = f"{model_save_path}temp_model_{trial.number}.h5"
 
     # モデルの訓練
-    history, dataset_size = train_model(model, all_input_sequences, all_target_tokens, epochs=epochs, batch_size=batch_size, model_path=temp_model_path, num_files=num_files, learning_rate=learning_rate, architecture=architecture)
+    history, dataset_size = train_model(
+        model, 
+        all_input_sequences, 
+        all_target_tokens, 
+        epochs=epochs, 
+        batch_size=batch_size, 
+        model_path=temp_model_path, 
+        num_files=num_files, 
+        learning_rate=learning_rate, 
+        architecture=architecture, 
+        model_architecture_func=model_architecture_func  # 追加された引数
+    )
     
     # ベストモデルの評価
     if isinstance(history, list):
@@ -145,7 +163,7 @@ def main():
     epochs = best_params["epochs"]
     batch_size = best_params["batch_size"]
     learning_rate = best_params["learning_rate"]
-    seq_length = best_params["seq_length"]
+    seq_length = 1  # 固定値に設定
 
     global model_architecture_func, architecture
     vocab_set = set(tokens)
@@ -153,7 +171,7 @@ def main():
     all_target_tokens = []
 
     num_datasets = 0
-    num_files = 5
+    num_files = 10  # num_filesを増やす
 
     for dirpath, dirnames, filenames in os.walk(encode_dir_path):
         for file in filenames[:num_files]:
@@ -161,16 +179,22 @@ def main():
             encoded_tokens_list = load_dataset(file_path)
             for encoded_tokens in encoded_tokens_list:
                 num_datasets += 1
-                input_sequences, target_tokens = prepare_sequences(encoded_tokens, seq_length=seq_length)
-                all_input_sequences.extend(input_sequences)
-                all_target_tokens.extend(target_tokens)
+                if len(encoded_tokens) > seq_length:  # データ量が不十分な場合のチェックを追加
+                    input_sequences, target_tokens = prepare_sequences(encoded_tokens, seq_length=seq_length)
+                    all_input_sequences.extend(input_sequences)
+                    all_target_tokens.extend(target_tokens)
+                else:
+                    print(f"Not enough data in: {file_path}")
 
     if not all_input_sequences or not all_target_tokens:
         print("No data for training.")
         return
 
     vocab_size = len(vocab_set)
-    model = model_architecture_func(seq_length, vocab_size + 1, learning_rate)
+    mirrored_strategy = tf.distribute.MirroredStrategy()  # 分散学習の設定を追加
+
+    with mirrored_strategy.scope():
+        model = model_architecture_func(seq_length, vocab_size + 1, learning_rate)
 
     all_input_sequences = np.array(all_input_sequences)
     all_target_tokens = np.array(all_target_tokens)
@@ -178,7 +202,18 @@ def main():
     model_path = best_model_path
     plot_path = f"{model_save_path}training_history.png"
 
-    history, dataset_size = train_model(model, all_input_sequences, all_target_tokens, epochs=epochs, batch_size=batch_size, model_path=model_path, num_files=num_files, learning_rate=learning_rate, architecture=architecture)
+    history, dataset_size = train_model(
+        model, 
+        all_input_sequences, 
+        all_target_tokens, 
+        epochs=epochs, 
+        batch_size=batch_size, 
+        model_path=model_path, 
+        num_files=num_files, 
+        learning_rate=learning_rate, 
+        architecture=architecture, 
+        model_architecture_func=model_architecture_func  # 追加された引数
+    )
     
     if history:
         plot_training_history(history, save_path=plot_path, epochs=epochs, batch_size=batch_size, learning_rate=learning_rate, num_files=num_files, dataset_size=dataset_size)

@@ -173,5 +173,6 @@ def main():
     print(f"Model size: {model_size:.2f} MB")
     print(f"Model parameters: {model_params}")
 
+
 if __name__ == "__main__":
     main()

@@ -1,0 +1,11 @@
+{
+    "epochs": 160,
+    "batch_size": 1024,
+    "num_files": 2400,
+    "learning_rate": 0.0005,
+    "dataset_size": 1268272,
+    "model_size_MB": 22.084243774414062,
+    "model_params": 5781002,
+    "model_architecture": "define_lstm_model",
+    "training_end_time": "2024-06-04 02:55:36"
+}
