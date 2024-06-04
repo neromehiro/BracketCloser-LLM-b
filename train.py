@@ -10,6 +10,8 @@ from modules.training_utils import train_model, plot_training_history, save_meta
 from modules.custom_layers import CustomMultiHeadAttention
 
 # プロジェクトのルートディレクトリをPythonパスに追加
+os.environ["WANDB_CONSOLE"] = "off"
+# os.environ["WANDB_MODE"] = "disabled"
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 # データセットの保存先ディレクトリ
 encode_dir_path = "./components/dataset/preprocessed/"
