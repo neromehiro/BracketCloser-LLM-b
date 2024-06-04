@@ -1,4 +1,4 @@
-# evaluate.py
+
 import sys
 import os
 import json
@@ -6,9 +6,9 @@ import numpy as np
 import tensorflow as tf
 import logging
 from tensorflow.keras.models import load_model
-from tensorflow.keras.layers import MultiHeadAttention
-from typing import List
+from tensorflow.keras.layers import MultiHeadAttention, Input
 from tensorflow.keras.preprocessing.sequence import pad_sequences  # pad_sequencesをインポート
+from typing import List
 
 # モジュールのパスを追加
 sys.path.append(os.path.join(os.path.dirname(__file__), 'modules'))
@@ -74,6 +74,10 @@ model_type = get_model_type(model_metadata_path)
 # モデルのロード
 model = load_model(model_save_path, custom_objects={'CustomMultiHeadAttention': CustomMultiHeadAttention})
 
+# モデルの期待する入力シーケンスの長さを取得
+expected_input_shape = model.input_shape[1]
+default_max_seq_length = expected_input_shape
+
 def load_dataset(filepath: str) -> List[str]:
     with open(filepath, "r", encoding="utf-8") as f:
         dataset = json.load(f)
@@ -90,7 +94,7 @@ def tokenize_string(string: str) -> List[str]:
             tokens.append(char)
         else:
             current_token += char
-    if current_token:
+    if (current_token):
         tokens.append(current_token)
     return tokens
 
@@ -114,12 +118,15 @@ def split_input_output(data):
 
 
 
+
+
 def evaluate_model(model, test_data, model_type):
     correct_predictions = 0
     results = []
 
-    # デフォルトの最大シーケンス長を設定
-    default_max_seq_length = 30
+    # input_shapeをモデルから動的に取得
+    input_shape = model.input_shape
+    max_seq_length = input_shape[1]
 
     input_output_pairs = split_input_output(test_data)
 
@@ -127,11 +134,8 @@ def evaluate_model(model, test_data, model_type):
         # Preprocessing
         preprocessed_input = preprocess_input(input_seq)
 
-        # 最大シーケンス長を修正: 常にdefault_max_seq_lengthにパディング
-        if len(preprocessed_input) > default_max_seq_length:
-            preprocessed_input = preprocessed_input[:default_max_seq_length]
-        else:
-            preprocessed_input = pad_sequences([preprocessed_input], maxlen=default_max_seq_length, padding='post', value=0)[0]
+        # 入力をモデルの期待する形状にパディング
+        preprocessed_input = pad_sequences([preprocessed_input], maxlen=max_seq_length, padding='post', value=0)[0]
 
         # デバッグ: 入力シーケンスの確認
         logging.debug(f"Input with output token: {input_seq}")
@@ -146,18 +150,25 @@ def evaluate_model(model, test_data, model_type):
             if model_type in ["transformer", "bert", "gpt"]:
                 attention_mask = np.ones((1, preprocessed_input.shape[0]), dtype=np.float32)  # attention_maskを修正
                 model_input = [np.expand_dims(preprocessed_input, axis=0), attention_mask]  # model_inputを修正
-                predicted_output = model.predict(model_input)
             else:
                 model_input = np.expand_dims(preprocessed_input, axis=0)  # バッチ次元追加
-                predicted_output = model.predict(model_input)
-
+            
+            # 次のトークンを予測
+            predicted_output = model.predict(model_input)
+            logging.debug(f"Predicted output raw shape (step {i}): {predicted_output.shape}")  # 予測出力の形状をログに記録
             logging.debug(f"Predicted output raw (step {i}): {predicted_output}")
-            predicted_id = np.argmax(predicted_output, axis=-1).flatten()[0]
+
+            # 出力の形状が (1, 10) であるため、予測トークンIDを取得
+            predicted_id = np.argmax(predicted_output, axis=-1)[0]  # 最初のバッチのみ
+
             predicted_output_ids.append(predicted_id)
 
-            # 入力シーケンスを更新して次の予測に使用 (train.pyのprepare_sequences関数を参考に修正)
-            preprocessed_input = np.roll(preprocessed_input, -1)  # 左に1つシフト
-            preprocessed_input[-1] = predicted_id  # 最後の要素を更新
+            # 入力シーケンスを更新して次の予測に使用
+            if len(preprocessed_input) < max_seq_length:
+                preprocessed_input = np.concatenate([preprocessed_input, [predicted_id]])  # 末尾に要素を追加
+            else:
+                preprocessed_input = np.roll(preprocessed_input, -1)  # 左に1つシフト
+                preprocessed_input[-1] = predicted_id  # 最後の要素を更新
 
         predicted_output = decode_output(predicted_output_ids)
         expected_output_reconstructed = decode_output(expected_output_tokens)
@@ -169,14 +180,14 @@ def evaluate_model(model, test_data, model_type):
             results.append(f"問題{idx + 1} 不正解\n入力した単語 Input: {input_seq}\n出力の単語: {predicted_output}\n正解の単語: {expected_output_reconstructed}\n")
 
     accuracy = correct_predictions / len(test_data)
+    accurate_percentage = correct_predictions / len(input_output_pairs) * 100
 
     # 結果をファイルに保存
     with open(evaluation_result_path, "w", encoding="utf-8") as f:
         f.write("\n".join(results))
-        f.write(f"\nAccuracy: {accuracy * 100:.2f}%")
+        f.write(f"\nAccuracy: {accurate_percentage:.2f}%")
 
-    return accuracy
-
+    return accurate_percentage
 
 # テストデータのサンプル数
 num_test_samples = 100
@@ -193,5 +204,5 @@ test_data = load_dataset(test_data_path)
 
 # モデルの評価
 accuracy = evaluate_model(model, test_data, model_type)
-print(f"モデルの精度: {accuracy * 100:.2f}%")
+print(f"モデルの精度: {accuracy:.2f}%")
 print(f"評価結果は {evaluation_result_path} に保存されました。")
