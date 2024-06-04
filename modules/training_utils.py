@@ -52,6 +52,8 @@ class TimeHistory(Callback):
         self.times.append(time.time() - self.epoch_time_start)
 
 
+
+
 def train_model(model, input_sequences, target_tokens, epochs, batch_size, model_path, num_files, learning_rate, architecture, model_architecture_func):
     if len(input_sequences) > 0 and len(target_tokens) > 0:
         print(f"Shapes: {input_sequences.shape}, {target_tokens.shape}")
@@ -62,15 +64,15 @@ def train_model(model, input_sequences, target_tokens, epochs, batch_size, model
         sample_weights = np.where(target_tokens != 0, 1.0, 0.0)
 
         if 'transformer' in architecture or 'gpt' in architecture:
-            attention_mask = np.ones_like(input_sequences)
+            attention_mask = (input_sequences != 0).astype(np.float32)
 
             train_inputs = {
                 'input_1': input_sequences[:-num_validation_samples],
-                'input_2': attention_mask[:-num_validation_samples]
+                'attention_mask': attention_mask[:-num_validation_samples]
             }
             val_inputs = {
                 'input_1': input_sequences[-num_validation_samples:],
-                'input_2': attention_mask[-num_validation_samples:]
+                'attention_mask': attention_mask[-num_validation_samples:]
             }
 
             train_dataset = tf.data.Dataset.from_tensor_slices(
@@ -84,24 +86,21 @@ def train_model(model, input_sequences, target_tokens, epochs, batch_size, model
                  target_tokens[-num_validation_samples:],
                  sample_weights[-num_validation_samples:])
             ).batch(batch_size)
-
         else:
-            # 他のアーキテクチャの場合は、attention_maskは不要なのでそのままのデータセットを使う
-            train_dataset = tf.data.Dataset.from_tensor_slices(
-                (input_sequences[:-num_validation_samples],
-                 target_tokens[:-num_validation_samples],
-                 sample_weights[:-num_validation_samples])
-            ).batch(batch_size)
+                train_dataset = tf.data.Dataset.from_tensor_slices(
+                    (input_sequences[:-num_validation_samples],
+                    target_tokens[:-num_validation_samples],
+                    sample_weights[:-num_validation_samples])
+                ).batch(batch_size)
 
-            validation_dataset = tf.data.Dataset.from_tensor_slices(
-                (input_sequences[-num_validation_samples:],
-                 target_tokens[-num_validation_samples:],
-                 sample_weights[-num_validation_samples:])
-            ).batch(batch_size)
+                validation_dataset = tf.data.Dataset.from_tensor_slices(
+                    (input_sequences[-num_validation_samples:],
+                    target_tokens[-num_validation_samples:],
+                    sample_weights[-num_validation_samples:])
+                ).batch(batch_size)
 
         train_dataset = train_dataset.shuffle(buffer_size=1024)
 
-        # データセットの形状を確認
         for data, labels, weights in train_dataset.take(1):
             if isinstance(data, dict):
                 for key, value in data.items():
@@ -111,18 +110,15 @@ def train_model(model, input_sequences, target_tokens, epochs, batch_size, model
             print("Train labels batch shape: ", labels.shape)
             print("Train sample weights batch shape: ", weights.shape)
 
-        wandb.init(project="bracket_closer_llm")
-
         time_callback = TimeHistory()
         checkpoint_callback = ModelCheckpoint(filepath=model_path, save_weights_only=False, save_best_only=False, save_freq='epoch', verbose=1)
         history_callback = TrainingHistory(model_path, model_architecture_func)
-        wandb_callback = WandbCallback()
-
+        
         history = model.fit(
             train_dataset,
             epochs=epochs,
             validation_data=validation_dataset,
-            callbacks=[time_callback, checkpoint_callback, history_callback, wandb_callback]
+            callbacks=[time_callback, checkpoint_callback, history_callback]
         )
 
         model.save(model_path, include_optimizer=False, save_format='h5')
@@ -131,7 +127,6 @@ def train_model(model, input_sequences, target_tokens, epochs, batch_size, model
     else:
         print("No data for training.")
         return None, 0
-
 
 def plot_training_history(history, save_path, epochs, batch_size, learning_rate, num_files, dataset_size):
     losses = [epoch_logs['loss'] for epoch_logs in history]
