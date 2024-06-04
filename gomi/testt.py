@@ -7,8 +7,11 @@ from tensorflow.keras.layers import LSTM, Dense, Embedding, TimeDistributed, Dro
 
 # トークンのセット
 tokens = ["(", ")", "[", "]", "【", "】", "{", "}", "input", ",output", ","]
-token2id = {token: i for i, token in enumerate(tokens)}
-id2token = {i: token for token, i in token2id.items()}
+# トークンとIDを対応付ける辞書
+token2id = {token: i + 1 for i, token in enumerate(tokens)}
+
+# IDとトークンを対応付ける辞書
+id2token = {i + 1: token for i, token in enumerate(tokens)}
 
 # サンプルデータ生成
 def generate_sample_data():

@@ -15,8 +15,11 @@ logging.basicConfig(filename='inference_validation_log.txt', level=logging.DEBUG
 
 # トークンとIDを対応付ける辞書
 tokens = ["(", ")", "【", "】", "{", "}", "input", ",output", ","]
-token2id = {token: i for i, token in enumerate(tokens)}
-id2token = {i: token for token, i in token2id.items()}
+# トークンとIDを対応付ける辞書
+token2id = {token: i + 1 for i, token in enumerate(tokens)}
+
+# IDとトークンを対応付ける辞書
+id2token = {i + 1: token for i, token in enumerate(tokens)}
 
 # ディレクトリ設定(コメントアウトしているのも削除しないで!!)
 # model_save_path = "./models/trash/best_model_lstm.h5"

@@ -4,8 +4,14 @@ import json
 import numpy as np
 
 # トークンとIDの対応付け
+# 括弧の種類とキーワード
 tokens = ["(", ")", "【", "】", "{", "}", "input", ",output", ","]
-token2id = {token: i for i, token in enumerate(tokens)}
+
+# トークンとIDを対応付ける辞書
+token2id = {token: i + 1 for i, token in enumerate(tokens)}
+
+# IDとトークンを対応付ける辞書
+id2token = {i + 1: token for i, token in enumerate(tokens)}
 
 def load_dataset(filepath):
     with open(filepath, "r") as f:

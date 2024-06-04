@@ -8,10 +8,10 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 tokens = ["(", ")", "【", "】", "{", "}", "input", ",output", ","]
 
 # トークンとIDを対応付ける辞書
-token2id = {token: i for i, token in enumerate(tokens)}
+token2id = {token: i + 1 for i, token in enumerate(tokens)}
 
 # IDとトークンを対応付ける辞書
-id2token = {i: token for token, i in token2id.items()}
+id2token = {i + 1: token for i, token in enumerate(tokens)}
 
 # データの保存先ディレクトリ
 dirs = {
@@ -74,7 +74,7 @@ def preprocess_and_save_dataset(dataset, filepath, max_seq_length=30):
     preprocessed_dataset = [[token2id[token] for token in data if token in token2id] for data in tokenized_dataset]
 
     # パディング
-    preprocessed_dataset = pad_sequences(preprocessed_dataset, maxlen=max_seq_length, padding='post', value=-1).tolist()
+    preprocessed_dataset = pad_sequences(preprocessed_dataset, maxlen=max_seq_length, padding='post', value=0).tolist()
 
     preprocessed_path = os.path.join(dirs["preprocessed"], filepath)
     try:

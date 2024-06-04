@@ -1,5 +1,3 @@
-# modules/model_utils.py
-
 import tensorflow as tf
 from tensorflow.keras import layers, models
 from modules.custom_layers import CustomMultiHeadAttention
@@ -15,9 +13,11 @@ def define_gru_model(seq_length, output_dim, learning_rate, embedding_dim=64, gr
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), 
         loss="sparse_categorical_crossentropy", 
-        metrics=["accuracy"]
+        metrics=["accuracy"],
+        weighted_metrics=["accuracy"]
     )
     return model
+
 
 def define_transformer_model(seq_length, output_dim, learning_rate, embedding_dim=64, num_heads=4, ffn_units=128, dropout_rate=0.1):
     inputs = layers.Input(shape=(seq_length,))
@@ -29,13 +29,15 @@ def define_transformer_model(seq_length, output_dim, learning_rate, embedding_di
     ffn_output = layers.Dense(embedding_dim)(ffn)
     ffn_output = layers.Dropout(dropout_rate)(ffn_output)
     ffn_output = layers.LayerNormalization(epsilon=1e-6)(ffn_output + attention_output)
-    outputs = layers.Dense(output_dim, activation="softmax")(ffn_output)
+    x = layers.GlobalAveragePooling1D()(ffn_output)
+    outputs = layers.Dense(output_dim, activation="softmax")(x)
 
     model = models.Model(inputs, outputs)
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), 
         loss="sparse_categorical_crossentropy", 
-        metrics=["accuracy"]
+        metrics=["accuracy"],
+        weighted_metrics=["accuracy"]
     )
     return model
 
@@ -52,7 +54,8 @@ def define_lstm_model(seq_length, output_dim, learning_rate, embedding_dim=256, 
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), 
         loss="sparse_categorical_crossentropy", 
-        metrics=["accuracy"]
+        metrics=["accuracy"],
+        weighted_metrics=["accuracy"]
     )
     return model
 
@@ -68,13 +71,15 @@ def define_bert_model(seq_length, output_dim, learning_rate, embedding_dim=64, n
         ffn_output = layers.Dense(embedding_dim)(ffn)
         ffn_output = layers.Dropout(dropout_rate)(ffn_output)
         x = layers.LayerNormalization(epsilon=1e-6)(ffn_output + attention_output)
+    x = layers.GlobalAveragePooling1D()(x)  # 出力の形状を修正
     outputs = layers.Dense(output_dim, activation="softmax")(x)
 
     model = models.Model(inputs, outputs)
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate), 
         loss="sparse_categorical_crossentropy", 
-        metrics=["accuracy"]
+        metrics=["accuracy"],
+        weighted_metrics=["accuracy"]
     )
     return model
 
@@ -104,6 +109,6 @@ def define_gpt_model(seq_length, output_dim, learning_rate, embedding_dim=64, nu
     
     # Compile Model
     optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-    model.compile(optimizer=optimizer, loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False), metrics=['accuracy'])
+    model.compile(optimizer=optimizer, loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=False), metrics=['accuracy'], weighted_metrics=['accuracy'])
     
     return model

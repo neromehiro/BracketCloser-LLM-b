@@ -1,5 +1,3 @@
-
-import sys
 import os
 import json
 import numpy as np
@@ -7,8 +5,9 @@ import tensorflow as tf
 import logging
 from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import MultiHeadAttention, Input
-from tensorflow.keras.preprocessing.sequence import pad_sequences  # pad_sequencesをインポート
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 from typing import List
+import sys  # 追加
 
 # モジュールのパスを追加
 sys.path.append(os.path.join(os.path.dirname(__file__), 'modules'))
@@ -26,6 +25,10 @@ dirs = {
     "preprocessed": "./components/dataset/preprocessed",
 }
 
+# 必要なディレクトリを作成
+for dir_path in dirs.values():
+    os.makedirs(dir_path, exist_ok=True)
+
 # モデルの保存パス
 model_save_path = "./models/best_model.h5"
 model_metadata_path = "./models/training_info.json"
@@ -38,8 +41,8 @@ evaluation_result_path = "evaluation_result.txt"
 
 # トークンとIDを対応付ける辞書
 tokens = ["(", ")", "【", "】", "{", "}", "input", ",output", ","]
-token2id = {token: i for i, token in enumerate(tokens)}
-id2token = {i: token for token, i in token2id.items()}
+token2id = {token: i + 1 for i, token in enumerate(tokens)}
+id2token = {i + 1: token for i, token in enumerate(tokens)}
 
 # CustomMultiHeadAttentionの定義
 class CustomMultiHeadAttention(MultiHeadAttention):
@@ -94,7 +97,7 @@ def tokenize_string(string: str) -> List[str]:
             tokens.append(char)
         else:
             current_token += char
-    if (current_token):
+    if current_token:
         tokens.append(current_token)
     return tokens
 
@@ -115,8 +118,6 @@ def split_input_output(data):
         output_seq = item.split(",output:")[1]
         input_output_pairs.append((input_seq, output_seq))
     return input_output_pairs
-
-
 
 def evaluate_model(model, test_data, model_type):
     correct_predictions = 0
@@ -162,6 +163,7 @@ def evaluate_model(model, test_data, model_type):
 
             # デバッグ: 予測された出力を確認
             logging.debug(f"Predicted token id: {predicted_id}")
+            logging.debug(f"Predicted token: {id2token.get(predicted_id, 'unknown')}")
 
             # 入力シーケンスを更新して次の予測に使用
             if len(preprocessed_input_padded) < max_seq_length:
@@ -188,7 +190,6 @@ def evaluate_model(model, test_data, model_type):
 
     # 結果を戻り値として返す
     return accurate_percentage
-
 
 # テストデータのサンプル数
 num_test_samples = 100

@@ -5,7 +5,7 @@ docker pull sonoisa/deep-learning-coding:pytorch1.12.0_tensorflow2.9.1
 
 
 
-  export PROJECT_DIR=$(pwd)
+export PROJECT_DIR=$(pwd)
 docker run -it \
   -v "${PROJECT_DIR}:/app/project" \
   --workdir /app/project \

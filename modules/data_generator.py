@@ -8,10 +8,10 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 tokens = ["(", ")", "【", "】", "{", "}", "input", ",output", ","]
 
 # トークンとIDを対応付ける辞書
-token2id = {token: i for i, token in enumerate(tokens)}
+token2id = {token: i + 1 for i, token in enumerate(tokens)}
 
 # IDとトークンを対応付ける辞書
-id2token = {i: token for token, i in token2id.items()}
+id2token = {i + 1: token for i, token in enumerate(tokens)}
 
 # データの保存先ディレクトリ
 dirs = {

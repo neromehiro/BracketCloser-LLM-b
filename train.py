@@ -63,17 +63,17 @@ def select_mode():
 def prepare_sequences(encoded_tokens, seq_length):
     input_sequences = []
     target_tokens = []
-    
+
     # エンコードされたトークンを用いてシーケンスを作成
     for i in range(1, len(encoded_tokens)):
         input_seq = encoded_tokens[:i]
         target_seq = encoded_tokens[i]
         input_sequences.append(input_seq)
         target_tokens.append(target_seq)
-    
+
     # シーケンスの長さを揃えるためにパディングを追加
-    input_sequences = pad_sequences(input_sequences, maxlen=seq_length, padding='post', value=token2id[","])
-    target_tokens = pad_sequences([target_tokens], maxlen=len(input_sequences), padding='post', value=token2id[","])[0]
+    input_sequences = pad_sequences(input_sequences, maxlen=seq_length, padding='post', value=0)  # パディング値を0に設定
+    target_tokens = pad_sequences([target_tokens], maxlen=len(input_sequences), padding='post', value=0)[0]
 
     return input_sequences, target_tokens
 

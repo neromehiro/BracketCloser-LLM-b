@@ -1,13 +1,13 @@
 {
-    "training_start_time": "20240604_195217",
-    "training_duration_minutes": 0.8636071333333334,
+    "training_start_time": "20240604_213909",
+    "training_duration_minutes": 0.4045704666666667,
     "epochs": 1,
     "batch_size": 128,
     "num_files": 5,
     "learning_rate": 0.01,
     "dataset_size": 89900,
-    "model_size_MB": 1.5592193603515625,
-    "model_params": 398474,
-    "model_architecture": "define_gpt_model",
-    "training_end_time": "2024-06-04 19:53:09"
+    "model_size_MB": 0.3641815185546875,
+    "model_params": 84490,
+    "model_architecture": "define_transformer_model",
+    "training_end_time": "2024-06-04 21:39:33"
 }
