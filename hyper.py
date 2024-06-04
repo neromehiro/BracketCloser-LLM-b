@@ -14,8 +14,7 @@ from modules.training_utils import train_model, plot_training_history, save_meta
 # 訓練データのパス
 encode_dir_path = "./components/dataset/preprocessed/"
 model_save_base_path = "./models/"
-study_name = "model_optimization_study"  # Study name for Optuna
-storage_name = "sqlite:///optuna_study.db"  # SQLite database for Optuna
+storage_base_path = "./optuna_studies/"
 
 # 初期設定のグローバル変数
 model_architecture_func = None
@@ -29,8 +28,30 @@ os.environ["WANDB_SILENT"] = "true"
 def main():
     global model_architecture_func, architecture, best_loss
     
-    architecture_name = input("Enter the model architecture (gru, transformer, lstm, bert, gpt): ").strip()
-    model_architecture_func, architecture = setup(architecture_name)
+    # 再開するか新規開始かを選択
+    option = input("Choose an option:\n1. Resume existing study\n2. Start a new study\nEnter 1 or 2: ").strip()
+    
+    if option == "1":
+        # 再開する場合
+        studies = [f for f in os.listdir(storage_base_path) if f.startswith("hyper_")]
+        if not studies:
+            print("No existing studies found. Starting a new study.")
+            option = "2"
+        else:
+            for i, study_folder in enumerate(studies):
+                print(f"{i + 1}. {study_folder}")
+            study_index = int(input("Enter the number of the study to resume: ").strip()) - 1
+            study_folder = studies[study_index]
+            study_name = study_folder
+            storage_name = f"sqlite:///{storage_base_path}/{study_folder}/optuna_study.db"
+            architecture_name = study_folder.split('_')[2]
+    if option == "2":
+        # 新規開始の場合
+        architecture_name = input("Enter the model architecture (gru, transformer, lstm, bert, gpt): ").strip()
+        model_architecture_func, architecture = setup(architecture_name)
+        save_path = create_save_folder(storage_base_path, architecture)
+        study_name = os.path.basename(save_path)
+        storage_name = f"sqlite:///{save_path}/optuna_study.db"
     
     time_limit_str = input("Enter the training time limit (e.g., '3min', '1hour', '5hour'): ").strip()
     time_limit = parse_time_limit(time_limit_str)
@@ -56,7 +77,7 @@ def main():
 
     # トライアルの最適化
     try:
-        study.optimize(lambda trial: objective(trial, architecture, best_loss, encode_dir_path, lambda: create_save_folder(model_save_base_path, architecture), trial.number), timeout=time_limit.total_seconds(), callbacks=[callback])
+        study.optimize(lambda trial: objective(trial, architecture, best_loss, encode_dir_path, lambda: create_save_folder(storage_base_path, architecture), trial.number), timeout=time_limit.total_seconds(), callbacks=[callback])
     except Exception as e:
         print(f"An exception occurred during optimization: {e}")
     finally:
@@ -137,7 +158,7 @@ def main():
     all_input_sequences = np.array(all_input_sequences)
     all_target_tokens = np.array(all_target_tokens)
 
-    save_path = create_save_folder(model_save_base_path, architecture)
+    save_path = create_save_folder(storage_base_path, architecture)
 
     mirrored_strategy = tf.distribute.MirroredStrategy()  # 分散学習の設定を追加
 
