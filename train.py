@@ -4,15 +4,21 @@ import sys
 import json
 import numpy as np
 from datetime import datetime
+import pytz
 from modules.data_utils import load_dataset, prepare_sequences, tokens, token2id
 from modules.model_utils import define_gru_model, define_transformer_model, define_lstm_model, define_bert_model, define_gpt_model
 from modules.training_utils import train_model, plot_training_history, save_metadata
 from modules.custom_layers import CustomMultiHeadAttention
 
-# プロジェクトのルートディレクトリをPythonパスに追加
+# 日本時間のタイムゾーンを設定
+japan_timezone = pytz.timezone("Asia/Tokyo")
+
+# 環境変数設定
 os.environ["WANDB_CONSOLE"] = "off"
-# os.environ["WANDB_MODE"] = "disabled"
+os.environ["WANDB_SILENT"] = "true"
+# プロジェクトのルートディレクトリをPythonパスに追加
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 # データセットの保存先ディレクトリ
 encode_dir_path = "./components/dataset/preprocessed/"
 
@@ -34,7 +40,6 @@ SHORTCUTS = {
     "ber": "bert",
     "gpt": "gpt"
 }
-
 
 TRAINING_MODES = {
     "1min": {"epochs": 1, "batch_size": 128, "num_files": 5, "learning_rate": 0.01},
@@ -112,7 +117,6 @@ def select_mode_and_architecture():
     architecture = SHORTCUTS[arch]
     return MODEL_ARCHITECTURES[architecture], TRAINING_MODES[mode], architecture
 
-
 def main():
     model_architecture_func, training_mode, architecture = select_mode_and_architecture()
     epochs = training_mode["epochs"]
@@ -147,18 +151,45 @@ def main():
     all_input_sequences = np.array(all_input_sequences)
     all_target_tokens = np.array(all_target_tokens)
 
-    model_path = f"{model_save_path}best_model.h5"
-    plot_path = f"{model_save_path}training_history.png"
+    # 日本時間のタイムゾーンを設定
+    start_time = datetime.now(japan_timezone)
+    timestamp = start_time.strftime("%Y%m%d_%H%M%S")
 
+    # 一時フォルダ名作成
+    temp_save_dir = os.path.join(model_save_path, f"{architecture}_{timestamp}_temp")
+    os.makedirs(temp_save_dir, exist_ok=True)
+
+    training_info_path = os.path.join(temp_save_dir, "training_info.json")
+
+    with open(training_info_path, "w") as info_file:
+        json.dump({"training_start_time": timestamp}, info_file)
+
+    model_path = os.path.join(temp_save_dir, "best_model.h5")
+    plot_path = os.path.join(temp_save_dir, "training_history.png")
+
+    # モデルの学習
     history, dataset_size = train_model(model, all_input_sequences, all_target_tokens, epochs=epochs, batch_size=batch_size, model_path=model_path, num_files=num_files, learning_rate=learning_rate, architecture=architecture, model_architecture_func=model_architecture_func)
     
     if history:
         plot_training_history(history, save_path=plot_path, epochs=epochs, batch_size=batch_size, learning_rate=learning_rate, num_files=num_files, dataset_size=dataset_size)
 
+    end_time = datetime.now(japan_timezone)
+    training_duration = (end_time - start_time).total_seconds() / 60  # 分単位に変換
+
+    # 実際の学習時間をフォルダ名に反映
+    final_save_dir = os.path.join(model_save_path, f"{architecture}_{timestamp}_{int(training_duration)}m")
+    os.rename(temp_save_dir, final_save_dir)
+
+    # パスを更新
+    training_info_path = os.path.join(final_save_dir, "training_info.json")
+    model_path = os.path.join(final_save_dir, "best_model.h5")
+    plot_path = os.path.join(final_save_dir, "training_history.png")
+
     model_size = os.path.getsize(model_path) / (1024 * 1024)  # MB単位に変換
     model_params = model.count_params()
 
     metadata = {
+        "training_duration_minutes": training_duration,
         "epochs": epochs,
         "batch_size": batch_size,
         "num_files": num_files,
@@ -167,14 +198,20 @@ def main():
         "model_size_MB": model_size,
         "model_params": model_params,
         "model_architecture": model_architecture_func.__name__,
-        "training_end_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "training_end_time": end_time.strftime("%Y-%m-%d %H:%M:%S")
     }
-    save_metadata(model_path, metadata)
+    
+    with open(training_info_path, "r") as info_file:
+        training_info = json.load(info_file)
+    training_info.update(metadata)
+    
+    with open(training_info_path, "w") as info_file:
+        json.dump(training_info, info_file, indent=4)
 
     print(f"Training finished.")
+    print(f"Training duration: {training_duration:.2f} minutes")
     print(f"Model size: {model_size:.2f} MB")
     print(f"Model parameters: {model_params}")
-
 
 if __name__ == "__main__":
     main()

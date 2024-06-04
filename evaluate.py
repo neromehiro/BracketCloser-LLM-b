@@ -26,7 +26,7 @@ dirs = {
 
 # モデルの保存パス
 model_save_path = "./models/best_model.h5"
-model_metadata_path = "./models/best_model_metadata.json"
+model_metadata_path = "./models/training_info.json"
 
 # テストデータの保存パス
 test_data_path = os.path.join(dirs["original"], "test_bracket_dataset.json")
