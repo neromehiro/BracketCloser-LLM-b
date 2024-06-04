@@ -156,7 +156,7 @@ def main():
     timestamp = start_time.strftime("%Y%m%d_%H%M%S")
 
     # 一時フォルダ名作成
-    temp_save_dir = os.path.join(model_save_path, f"{architecture}_{timestamp}_temp")
+    temp_save_dir = os.path.join(model_save_path, f"{timestamp}_{architecture}_temp")
     os.makedirs(temp_save_dir, exist_ok=True)
 
     training_info_path = os.path.join(temp_save_dir, "training_info.json")

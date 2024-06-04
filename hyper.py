@@ -1,4 +1,5 @@
 # hypre.py
+# hypre.py
 import optuna
 import sys
 import os
@@ -12,10 +13,9 @@ from modules.training_utils import train_model, plot_training_history, save_meta
 
 # 訓練データのパス
 encode_dir_path = "./components/dataset/preprocessed/"
-model_save_path = "./models/"
+model_save_base_path = "./models/"
 study_name = "model_optimization_study"  # Study name for Optuna
 storage_name = "sqlite:///optuna_study.db"  # SQLite database for Optuna
-best_model_path = f"{model_save_path}best_model.h5"  # Best model path
 
 # モデルアーキテクチャの辞書
 MODEL_ARCHITECTURES = {
@@ -30,6 +30,10 @@ MODEL_ARCHITECTURES = {
 model_architecture_func = None
 architecture = None
 best_loss = float('inf')
+
+# 環境変数設定
+os.environ["WANDB_CONSOLE"] = "off"
+os.environ["WANDB_SILENT"] = "true"
 
 def setup(architecture_name):
     global model_architecture_func, architecture
@@ -49,6 +53,14 @@ def parse_time_limit(time_limit_str):
         return timedelta(hours=hours)
     else:
         raise ValueError("Unsupported time limit format. Use 'min' or 'hour'.")
+
+def create_save_folder():
+    now = datetime.now()
+    timestamp = now.strftime("%Y%m%d_%H%M%S")
+    folder_name = f"hyper_{timestamp}_{architecture}_{now.strftime('%H%M')}"
+    save_path = os.path.join(model_save_base_path, folder_name)
+    os.makedirs(save_path, exist_ok=True)
+    return save_path
 
 def objective(trial):
     global model_architecture_func, architecture, best_loss
@@ -84,16 +96,13 @@ def objective(trial):
         return float('inf')
 
     vocab_size = len(vocab_set)
-    mirrored_strategy = tf.distribute.MirroredStrategy()  # 分散学習の設定を追加
-
-    with mirrored_strategy.scope():
-        model = model_architecture_func(seq_length, vocab_size + 1, learning_rate)
+    model = model_architecture_func(seq_length, vocab_size + 1, learning_rate)
 
     all_input_sequences = np.array(all_input_sequences)
     all_target_tokens = np.array(all_target_tokens)
 
-    # 一時的なモデル保存パス
-    temp_model_path = f"{model_save_path}temp_model_{trial.number}.h5"
+    save_path = create_save_folder()
+    temp_model_path = os.path.join(save_path, f"temp_model_{trial.number}.h5")
 
     # モデルの訓練
     history, dataset_size = train_model(
@@ -117,7 +126,7 @@ def objective(trial):
         loss = history.history['loss'][-1]
         if loss < best_loss:
             best_loss = loss
-            model.save(best_model_path)
+            model.save(os.path.join(save_path, "best_model.h5"))
             print(f"New best model saved with loss: {best_loss}")
         return loss
 
@@ -193,14 +202,16 @@ def main():
     vocab_size = len(vocab_set)
     mirrored_strategy = tf.distribute.MirroredStrategy()  # 分散学習の設定を追加
 
+    save_path = create_save_folder()
+
     with mirrored_strategy.scope():
         model = model_architecture_func(seq_length, vocab_size + 1, learning_rate)
 
     all_input_sequences = np.array(all_input_sequences)
     all_target_tokens = np.array(all_target_tokens)
 
-    model_path = best_model_path
-    plot_path = f"{model_save_path}training_history.png"
+    model_path = os.path.join(save_path, "best_model.h5")
+    plot_path = os.path.join(save_path, "training_history.png")
 
     history, dataset_size = train_model(
         model, 
