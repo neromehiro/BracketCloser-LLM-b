@@ -1,14 +1,14 @@
-# hypre.py
-# hypre.py
+# hyper.py
 import optuna
-import sys
 import os
 import numpy as np
 import tensorflow as tf
-from datetime import datetime, timedelta
+from datetime import datetime
 from tqdm import tqdm
+from modules.setup import setup, parse_time_limit
+from modules.objective import objective
+from modules.utils import create_save_folder
 from modules.data_utils import load_dataset, prepare_sequences, tokens
-from modules.model_utils import define_gru_model, define_transformer_model, define_lstm_model, define_bert_model, define_gpt_model
 from modules.training_utils import train_model, plot_training_history, save_metadata
 
 # 訓練データのパス
@@ -16,15 +16,6 @@ encode_dir_path = "./components/dataset/preprocessed/"
 model_save_base_path = "./models/"
 study_name = "model_optimization_study"  # Study name for Optuna
 storage_name = "sqlite:///optuna_study.db"  # SQLite database for Optuna
-
-# モデルアーキテクチャの辞書
-MODEL_ARCHITECTURES = {
-    "gru": define_gru_model,
-    "transformer": define_transformer_model,
-    "lstm": define_lstm_model,
-    "bert": define_bert_model,
-    "gpt": define_gpt_model
-}
 
 # 初期設定のグローバル変数
 model_architecture_func = None
@@ -35,104 +26,11 @@ best_loss = float('inf')
 os.environ["WANDB_CONSOLE"] = "off"
 os.environ["WANDB_SILENT"] = "true"
 
-def setup(architecture_name):
-    global model_architecture_func, architecture
-    if architecture_name in MODEL_ARCHITECTURES:
-        model_architecture_func = MODEL_ARCHITECTURES[architecture_name]
-        architecture = architecture_name
-    else:
-        raise ValueError(f"Unsupported architecture: {architecture_name}")
-
-def parse_time_limit(time_limit_str):
-    """時間制限の文字列をtimedeltaに変換する"""
-    if 'min' in time_limit_str:
-        minutes = int(time_limit_str.replace('min', '').strip())
-        return timedelta(minutes=minutes)
-    elif 'hour' in time_limit_str:
-        hours = int(time_limit_str.replace('hour', '').strip())
-        return timedelta(hours=hours)
-    else:
-        raise ValueError("Unsupported time limit format. Use 'min' or 'hour'.")
-
-def create_save_folder():
-    now = datetime.now()
-    timestamp = now.strftime("%Y%m%d_%H%M%S")
-    folder_name = f"hyper_{timestamp}_{architecture}_{now.strftime('%H%M')}"
-    save_path = os.path.join(model_save_base_path, folder_name)
-    os.makedirs(save_path, exist_ok=True)
-    return save_path
-
-def objective(trial):
+def main():
     global model_architecture_func, architecture, best_loss
     
-    # ハイパーパラメータの範囲を設定
-    epochs = trial.suggest_int("epochs", 1, 100)
-    batch_size = trial.suggest_int("batch_size", 32, 1024)
-    learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-1, log=True)
-    seq_length = 1  # 固定値に設定
-    
-    vocab_set = set(tokens)
-    all_input_sequences = []
-    all_target_tokens = []
-
-    num_datasets = 0
-    num_files = 10  # num_filesを増やす
-
-    for dirpath, dirnames, filenames in os.walk(encode_dir_path):
-        for file in filenames[:num_files]:
-            file_path = os.path.join(dirpath, file)
-            encoded_tokens_list = load_dataset(file_path)
-            for encoded_tokens in encoded_tokens_list:
-                num_datasets += 1
-                if len(encoded_tokens) > seq_length:  # データ量が不十分な場合のチェックを追加
-                    input_sequences, target_tokens = prepare_sequences(encoded_tokens, seq_length=seq_length)
-                    all_input_sequences.extend(input_sequences)
-                    all_target_tokens.extend(target_tokens)
-                else:
-                    print(f"Not enough data in: {file_path}")
-
-    if not all_input_sequences or not all_target_tokens:
-        print("No data for training.")
-        return float('inf')
-
-    vocab_size = len(vocab_set)
-    model = model_architecture_func(seq_length, vocab_size + 1, learning_rate)
-
-    all_input_sequences = np.array(all_input_sequences)
-    all_target_tokens = np.array(all_target_tokens)
-
-    save_path = create_save_folder()
-    temp_model_path = os.path.join(save_path, f"temp_model_{trial.number}.h5")
-
-    # モデルの訓練
-    history, dataset_size = train_model(
-        model, 
-        all_input_sequences, 
-        all_target_tokens, 
-        epochs=epochs, 
-        batch_size=batch_size, 
-        model_path=temp_model_path, 
-        num_files=num_files, 
-        learning_rate=learning_rate, 
-        architecture=architecture, 
-        model_architecture_func=model_architecture_func  # 追加された引数
-    )
-    
-    # ベストモデルの評価
-    if isinstance(history, list):
-        print("Training failed. Returning inf loss.")
-        return float('inf')
-    else:
-        loss = history.history['loss'][-1]
-        if loss < best_loss:
-            best_loss = loss
-            model.save(os.path.join(save_path, "best_model.h5"))
-            print(f"New best model saved with loss: {best_loss}")
-        return loss
-
-def main():
     architecture_name = input("Enter the model architecture (gru, transformer, lstm, bert, gpt): ").strip()
-    setup(architecture_name)
+    model_architecture_func, architecture = setup(architecture_name)
     
     time_limit_str = input("Enter the training time limit (e.g., '3min', '1hour', '5hour'): ").strip()
     time_limit = parse_time_limit(time_limit_str)
@@ -158,7 +56,7 @@ def main():
 
     # トライアルの最適化
     try:
-        study.optimize(objective, timeout=time_limit.total_seconds(), callbacks=[callback])
+        study.optimize(lambda trial: objective(trial, architecture, best_loss, encode_dir_path, lambda: create_save_folder(model_save_base_path, architecture)), timeout=time_limit.total_seconds(), callbacks=[callback])
     except Exception as e:
         print(f"An exception occurred during optimization: {e}")
     finally:
@@ -174,7 +72,44 @@ def main():
     learning_rate = best_params["learning_rate"]
     seq_length = 1  # 固定値に設定
 
-    global model_architecture_func, architecture
+    # モデル固有のベストパラメータの取得
+    if architecture == "gru":
+        embedding_dim = best_params["embedding_dim"]
+        gru_units = best_params["gru_units"]
+        dropout_rate = best_params["dropout_rate"]
+        recurrent_dropout_rate = best_params["recurrent_dropout_rate"]
+        model = model_architecture_func(seq_length, len(tokens) + 1, embedding_dim, gru_units, dropout_rate, recurrent_dropout_rate, learning_rate)
+    
+    elif architecture == "transformer":
+        embedding_dim = best_params["embedding_dim"]
+        num_heads = best_params["num_heads"]
+        ffn_units = best_params["ffn_units"]
+        dropout_rate = best_params["dropout_rate"]
+        model = model_architecture_func(seq_length, len(tokens) + 1, embedding_dim, num_heads, ffn_units, dropout_rate, learning_rate)
+    
+    elif architecture == "lstm":
+        embedding_dim = best_params["embedding_dim"]
+        lstm_units = best_params["lstm_units"]
+        dropout_rate = best_params["dropout_rate"]
+        recurrent_dropout_rate = best_params["recurrent_dropout_rate"]
+        num_layers = best_params["num_layers"]
+        model = model_architecture_func(seq_length, len(tokens) + 1, embedding_dim, lstm_units, dropout_rate, recurrent_dropout_rate, num_layers, learning_rate)
+    
+    elif architecture == "bert":
+        embedding_dim = best_params["embedding_dim"]
+        num_heads = best_params["num_heads"]
+        ffn_units = best_params["ffn_units"]
+        num_layers = best_params["num_layers"]
+        dropout_rate = best_params["dropout_rate"]
+        model = model_architecture_func(seq_length, len(tokens) + 1, embedding_dim, num_heads, ffn_units, num_layers, dropout_rate, learning_rate)
+    
+    elif architecture == "gpt":
+        embedding_dim = best_params["embedding_dim"]
+        num_heads = best_params["num_heads"]
+        ffn_units = best_params["ffn_units"]
+        dropout_rate = best_params["dropout_rate"]
+        model = model_architecture_func(seq_length, len(tokens) + 1, embedding_dim, num_heads, ffn_units, dropout_rate, learning_rate)
+
     vocab_set = set(tokens)
     all_input_sequences = []
     all_target_tokens = []
@@ -199,16 +134,15 @@ def main():
         print("No data for training.")
         return
 
-    vocab_size = len(vocab_set)
-    mirrored_strategy = tf.distribute.MirroredStrategy()  # 分散学習の設定を追加
-
-    save_path = create_save_folder()
-
-    with mirrored_strategy.scope():
-        model = model_architecture_func(seq_length, vocab_size + 1, learning_rate)
-
     all_input_sequences = np.array(all_input_sequences)
     all_target_tokens = np.array(all_target_tokens)
+
+    save_path = create_save_folder(model_save_base_path, architecture)
+
+    mirrored_strategy = tf.distribute.MirroredStrategy()  # 分散学習の設定を追加
+
+    with mirrored_strategy.scope():
+        model = model_architecture_func(seq_length, len(tokens) + 1, embedding_dim, num_heads, ffn_units, dropout_rate, learning_rate)
 
     model_path = os.path.join(save_path, "best_model.h5")
     plot_path = os.path.join(save_path, "training_history.png")
