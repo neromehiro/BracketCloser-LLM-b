@@ -1,3 +1,4 @@
+
 import os
 import json
 import numpy as np
@@ -7,12 +8,11 @@ from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import MultiHeadAttention, Input
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from typing import List
-import sys  # 追加
+import sys
+from datetime import datetime
+from modules.data_generator import generate_test_data, preprocess_and_save_dataset
 
-# モジュールのパスを追加
 sys.path.append(os.path.join(os.path.dirname(__file__), 'modules'))
-
-import data_generator
 
 # ログ設定
 logging.basicConfig(filename='debug_log.txt', level=logging.DEBUG, 
@@ -29,9 +29,43 @@ dirs = {
 for dir_path in dirs.values():
     os.makedirs(dir_path, exist_ok=True)
 
+# モデルの選択
+def get_model_list_sorted_by_date(models_dir='./models'):
+    model_list = [d for d in os.listdir(models_dir) if os.path.isdir(os.path.join(models_dir, d))]
+    
+    # 不要なフォルダを除外
+    model_list = [d for d in model_list if d not in ["残すモデル", "trash"]]
+    
+    def extract_date(model_name):
+        try:
+            parts = model_name.split('_')
+            if len(parts) >= 3:
+                timestamp = parts[1] + parts[2]  # '20240604_213643' => '20240604213643'
+                return datetime.strptime(timestamp, '%Y%m%d%H%M%S')
+            else:
+                raise ValueError("Invalid model name format")
+        except Exception as e:
+            print(f"Error parsing date from {model_name}: {e}")
+            return datetime.min
+
+
+    model_list.sort(key=extract_date, reverse=True)
+    return model_list[:9]  # 最新の9個のモデルのみを表示
+
+
+def select_model(models_dir='./models'):
+    model_list = get_model_list_sorted_by_date(models_dir)
+    print("Available models (sorted by latest):")
+    for idx, model_name in enumerate(model_list, 1):
+        print(f"{idx}: {model_name}")
+    
+    selected_index = int(input("Select the model index: ")) - 1
+    selected_model_path = os.path.join(models_dir, model_list[selected_index])
+    return selected_model_path
+
 # モデルの保存パス
-model_save_path = "./models/best_model.h5"
-model_metadata_path = "./models/training_info.json"
+model_save_path = select_model()
+model_metadata_path = os.path.join(model_save_path, "training_info.json")
 
 # テストデータの保存パス
 test_data_path = os.path.join(dirs["original"], "test_bracket_dataset.json")
@@ -75,13 +109,20 @@ def get_model_type(metadata_path: str) -> str:
 model_type = get_model_type(model_metadata_path)
 
 # モデルのロード
-model = load_model(model_save_path, custom_objects={'CustomMultiHeadAttention': CustomMultiHeadAttention})
+model_path = os.path.join(model_save_path, "best_model.h5")
+model = load_model(model_path, custom_objects={'CustomMultiHeadAttention': CustomMultiHeadAttention})
+
+# モデルのコンパイル
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
 # モデルの期待する入力シーケンスの長さを取得
 expected_input_shape = model.input_shape[1]
 default_max_seq_length = expected_input_shape
 
 def load_dataset(filepath: str) -> List[str]:
+    if not os.path.exists(filepath):
+        print(f"Error: File {filepath} does not exist.")
+        return []
     with open(filepath, "r", encoding="utf-8") as f:
         dataset = json.load(f)
     return dataset
@@ -97,7 +138,7 @@ def tokenize_string(string: str) -> List[str]:
             tokens.append(char)
         else:
             current_token += char
-    if current_token:
+    if (current_token):
         tokens.append(current_token)
     return tokens
 
@@ -114,12 +155,18 @@ def decode_output(output_seq: List[int]) -> str:
 def split_input_output(data):
     input_output_pairs = []
     for item in data:
-        input_seq = item.split(",output:")[0] + ",output"
-        output_seq = item.split(",output:")[1]
-        input_output_pairs.append((input_seq, output_seq))
+        if isinstance(item, str):  # itemが文字列であることを確認
+            input_seq = item.split(",output:")[0] + ",output"
+            output_seq = item.split(",output:")[1]
+            input_output_pairs.append((input_seq, output_seq))
+        else:
+            logging.error(f"Invalid data format: {item}")
     return input_output_pairs
 
 def evaluate_model(model, test_data, model_type):
+    if not test_data:
+        raise ValueError("Test data is empty. Please check if the dataset was generated and saved correctly.")
+    
     correct_predictions = 0
     results = []
 
@@ -130,47 +177,33 @@ def evaluate_model(model, test_data, model_type):
         max_seq_length = input_shape[1]
 
     input_output_pairs = split_input_output(test_data)
+    
+    if len(input_output_pairs) == 0:
+        raise ValueError("No input-output pairs found in the test data.")
 
     for idx, (input_seq, expected_output) in enumerate(input_output_pairs):
-        # Preprocessing
         preprocessed_input = preprocess_input(input_seq)
-
-        # 入力をモデルの期待する形状にパディング
         preprocessed_input_padded = pad_sequences(
             [preprocessed_input], maxlen=max_seq_length, padding='post', value=0
         )[0]
 
-        # デバッグ: 入力シーケンスの確認
-        logging.debug(f"Input with output token: {input_seq}")
-        logging.debug(f"Preprocessed input: {preprocessed_input_padded}")
-
         expected_output_tokens = preprocess_input(expected_output)
-        logging.debug(f"Expected output tokens: {expected_output_tokens}")
-
-        # モデルに input と expected_output の最初の部分を与える
         predicted_output_ids = []
         for i in range(len(expected_output_tokens)):
-            # モデルが複数の入力を期待しているか確認
             if isinstance(model.input, list):
                 model_inputs = [np.array([preprocessed_input_padded]), np.array([preprocessed_input_padded])]
             else:
                 model_inputs = np.array([preprocessed_input_padded])
 
-            # Predict
             predicted_output = model.predict(model_inputs)
             predicted_id = np.argmax(predicted_output[0], axis=-1)
             predicted_output_ids.append(predicted_id)
 
-            # デバッグ: 予測された出力を確認
-            logging.debug(f"Predicted token id: {predicted_id}")
-            logging.debug(f"Predicted token: {id2token.get(predicted_id, 'unknown')}")
-
-            # 入力シーケンスを更新して次の予測に使用
             if len(preprocessed_input_padded) < max_seq_length:
-                preprocessed_input_padded = np.concatenate([preprocessed_input_padded, [predicted_id]])  # 末尾に要素を追加
+                preprocessed_input_padded = np.concatenate([preprocessed_input_padded, [predicted_id]])
             else:
-                preprocessed_input_padded = np.roll(preprocessed_input_padded, -1)  # 左に1つシフト
-                preprocessed_input_padded[-1] = predicted_id  # 最後の要素を更新
+                preprocessed_input_padded = np.roll(preprocessed_input_padded, -1)
+                preprocessed_input_padded[-1] = predicted_id
 
         predicted_output = decode_output(predicted_output_ids)
         expected_output_reconstructed = decode_output(expected_output_tokens)
@@ -183,23 +216,26 @@ def evaluate_model(model, test_data, model_type):
 
     accurate_percentage = correct_predictions / len(input_output_pairs) * 100
 
-    # 結果をファイルに保存
+    result_filename = f"evaluation_result_{accurate_percentage:.2f}%.txt"
     with open(evaluation_result_path, "w", encoding="utf-8") as f:
         f.write("\n".join(results))
         f.write(f"\nAccuracy: {accurate_percentage:.2f}%")
 
-    # 結果を戻り値として返す
+    model_specific_result_path = os.path.join(model_save_path, result_filename)
+    with open(model_specific_result_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(results))
+        f.write(f"\nAccuracy: {accurate_percentage:.2f}%")
+
     return accurate_percentage
 
 # テストデータのサンプル数
 num_test_samples = 100
 
 # テストデータの生成
-test_dataset = data_generator.generate_test_data(num_test_samples)
+test_dataset = generate_test_data(num_test_samples)
 
 # テストデータの前処理と保存
-data_generator.preprocess_and_save_dataset(test_dataset, test_data_path)
-print("テストデータセットが保存された場所:", test_data_path)
+preprocess_and_save_dataset(test_dataset, "test_bracket_dataset.json", max_seq_length=30)
 
 # テストデータのロード
 test_data = load_dataset(test_data_path)
