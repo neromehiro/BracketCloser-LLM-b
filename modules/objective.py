@@ -18,7 +18,7 @@ def objective(trial, architecture, best_loss, encode_dir_path, create_save_folde
     
     # 最初のトライアルの場合、エポック数を制限
     if trial_number == 0:
-        epochs = trial.suggest_int("epochs", 5, 20)
+        epochs = trial.suggest_int("epochs", 3, 10)
     else:
         epochs = trial.suggest_int("epochs", 1, 100)
     
