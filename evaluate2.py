@@ -12,6 +12,10 @@ from datetime import datetime
 from modules.data_generator import generate_test_data, preprocess_and_save_dataset
 from modules.custom_layers import CustomMultiHeadAttention
 
+# モデルの保存パス
+model_save_path = 'optuna_studies/hyper_gru/temp_model_29.h5'
+
+
 sys.path.append(os.path.join(os.path.dirname(__file__), 'modules'))
 
 # ログ設定
@@ -30,8 +34,7 @@ for dir_path in dirs.values():
     os.makedirs(dir_path, exist_ok=True)
 
 # モデルの保存パス
-# モデルの保存パス
-model_save_path = 'optuna_studies/hyper_gru/temp_model_9.h5'
+
 
 model_path = model_save_path
 

@@ -51,6 +51,16 @@ TRAINING_MODES = {
     "24hours": {"epochs": 80, "batch_size": 1024, "num_files": 1200, "learning_rate": 0.0005},
     "2days": {"epochs": 160, "batch_size": 1024, "num_files": 2400, "learning_rate": 0.0005},
     "4days": {"epochs": 320, "batch_size": 1024, "num_files": 4800, "learning_rate": 0.0005},
+    "optuna_best": {  # 追加部分
+        "epochs": 2,
+        "batch_size": 796,
+        "num_files": 5,  # ファイル数は仮に設定
+        "learning_rate": 0.003639504540140406,
+        "embedding_dim": 144,
+        "gru_units": 234,
+        "dropout_rate": 0.3712051953331178,
+        "recurrent_dropout_rate": 0.1683334827675
+    }
 }
 
 def select_mode():
@@ -140,6 +150,8 @@ def select_mode_and_architecture():
     arch, mode = choice.split()
     architecture = SHORTCUTS[arch]
     return MODEL_ARCHITECTURES[architecture], TRAINING_MODES[mode], architecture
+
+
 
 def main():
     model_architecture_func, training_mode, architecture = select_mode_and_architecture()

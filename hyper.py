@@ -1,3 +1,4 @@
+
 import optuna
 import os
 import numpy as np
@@ -42,17 +43,21 @@ def main():
             study_index = int(input("Enter the number of the study to resume: ").strip()) - 1
             study_folder = studies[study_index]
             study_name = study_folder
+
+            # architecture_name をフォルダ名から抽出するロジックを変更
+            architecture_name_parts = study_folder.split('_')[1:]  # 最初の "hyper_" を除外
+            architecture_name = "_".join(architecture_name_parts)
+
             storage_name = f"sqlite:///{storage_base_path}/{study_folder}/optuna_study.db"
-            architecture_name = study_folder.split('_')[4]  # 修正
             model_architecture_func, architecture = setup(architecture_name)
 
     if option == "2":
         # 新規開始の場合
         architecture_name = input("Enter the model architecture (gru, transformer, lstm, bert, gpt): ").strip()
         model_architecture_func, architecture = setup(architecture_name)
-        save_path = os.path.join(storage_base_path, "hyper_" + architecture)
-        if not os.path.exists(save_path):
-            os.makedirs(save_path)
+
+        # 新しいフォルダを作成
+        save_path = create_save_folder(storage_base_path, "hyper_" + architecture)  # create_save_folder を使用
         study_name = os.path.basename(save_path)
         storage_name = f"sqlite:///{save_path}/optuna_study.db"
 
