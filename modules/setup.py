@@ -1,13 +1,14 @@
 # modules/setup.py
 import os
 from datetime import timedelta
+from modules.model_utils import define_gru_model, define_transformer_model, define_lstm_model, define_bert_model, define_gpt_model
 
 MODEL_ARCHITECTURES = {
-    "gru": "define_gru_model",
-    "transformer": "define_transformer_model",
-    "lstm": "define_lstm_model",
-    "bert": "define_bert_model",
-    "gpt": "define_gpt_model"
+    "gru": define_gru_model,
+    "transformer": define_transformer_model,
+    "lstm": define_lstm_model,
+    "bert": define_bert_model,
+    "gpt": define_gpt_model
 }
 
 def setup(architecture_name):

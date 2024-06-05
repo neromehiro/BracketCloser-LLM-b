@@ -1,0 +1,13 @@
+{
+    "epoch": 7,
+    "logs": {
+        "loss": 0.5254619121551514,
+        "accuracy": 0.23127084970474243,
+        "weighted_accuracy": 0.5229187607765198,
+        "val_loss": 0.5247392654418945,
+        "val_accuracy": 0.24037820100784302,
+        "val_weighted_accuracy": 0.5368943810462952
+    },
+    "time": "2024-06-05 06:24:27",
+    "model_architecture": "define_gru_model"
+}
