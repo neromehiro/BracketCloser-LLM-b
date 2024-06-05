@@ -128,6 +128,9 @@ def train_model(model, input_sequences, target_tokens, epochs, batch_size, model
         print("No data for training.")
         return None, 0
 
+
+
+
 def plot_training_history(history, save_path, epochs, batch_size, learning_rate, num_files, dataset_size):
     losses = [epoch_logs['loss'] for epoch_logs in history]
     val_losses = [epoch_logs['val_loss'] for epoch_logs in history]

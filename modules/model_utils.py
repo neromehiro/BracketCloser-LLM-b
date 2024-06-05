@@ -121,3 +121,8 @@ def define_gpt_model(seq_length, output_dim, learning_rate, embedding_dim=64, nu
     )
 
     return model
+
+
+
+
+
