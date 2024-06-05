@@ -16,7 +16,9 @@ from modules.custom_layers import CustomMultiHeadAttention
 # model_save_path = 'optuna_studies/hyper_gpt/temp_model_1.h5'
 # model_save_path = 'optuna_studies/hyper_gpt/temp_model_2.h5'
 # model_save_path = 'optuna_studies/hyper_gru/temp_model_27.h5' # 70パーセント以上
-model_save_path = 'optuna_studies/hyper_gru/temp_model_14.h5' # 70パーセント以上
+# model_save_path = 'optuna_studies/hyper_gru/temp_model_30.h5' # 60パーセント以上
+model_save_path = 'optuna_studies/hyper_lstm/temp_model_70_20240605183703.h5' # 76パーセント以上 68
+# model_save_path = 'optuna_studies/hyper_lstm/temp_model_71_20240605183704.h5' # 雑魚
 
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'modules'))
