@@ -20,29 +20,6 @@ def define_gru_model(seq_length, output_dim, learning_rate, embedding_dim=64, gr
 
 
 
-def define_transformer_model(seq_length, output_dim, learning_rate, embedding_dim=64, num_heads=4, ffn_units=128, dropout_rate=0.1):
-    inputs = layers.Input(shape=(seq_length,), name='input_1')
-    attention_mask = layers.Input(shape=(seq_length,), dtype=tf.float32, name='attention_mask')
-
-    x = layers.Embedding(input_dim=output_dim, output_dim=embedding_dim, mask_zero=True)(inputs)
-    attention_output = CustomMultiHeadAttention(num_heads=num_heads, key_dim=embedding_dim)(x, x, attention_mask=attention_mask)
-    attention_output = layers.Dropout(dropout_rate)(attention_output)
-    attention_output = layers.LayerNormalization(epsilon=1e-6)(attention_output + x)
-    ffn = layers.Dense(ffn_units, activation='relu')(attention_output)
-    ffn_output = layers.Dense(embedding_dim)(ffn)
-    ffn_output = layers.Dropout(dropout_rate)(ffn_output)
-    ffn_output = layers.LayerNormalization(epsilon=1e-6)(ffn_output + attention_output)
-    x = layers.GlobalAveragePooling1D()(ffn_output)
-    outputs = layers.Dense(output_dim, activation="softmax")(x)
-
-    model = models.Model(inputs=[inputs, attention_mask], outputs=outputs)
-    model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-        loss="sparse_categorical_crossentropy",
-        metrics=["accuracy"],
-        weighted_metrics=["accuracy"]
-    )
-    return model
 
 def define_lstm_model(seq_length, output_dim, learning_rate, embedding_dim=64, lstm_units=64, dropout_rate=0.2, recurrent_dropout_rate=0.2, num_layers=2):
     inputs = layers.Input(shape=(seq_length,))
@@ -85,14 +62,36 @@ def define_bert_model(seq_length, output_dim, learning_rate, embedding_dim=64, n
     )
     return model
 
+def define_transformer_model(seq_length, output_dim, learning_rate, embedding_dim=64, num_heads=4, ffn_units=128, dropout_rate=0.1):
+    inputs = layers.Input(shape=(seq_length,), name='input_1')
+    attention_mask = layers.Input(shape=(seq_length,), dtype=tf.float32, name='attention_mask')
 
-def define_gpt_model(seq_length, output_dim, learning_rate, embedding_dim=64, num_heads=8, ffn_units=2048, dropout_rate=0.1):
+    x = layers.Embedding(input_dim=output_dim, output_dim=embedding_dim, mask_zero=True)(inputs)
+    attention_output = CustomMultiHeadAttention(num_heads=num_heads, key_dim=embedding_dim)(x, x, attention_mask=attention_mask)
+    attention_output = layers.Dropout(dropout_rate)(attention_output)
+    attention_output = layers.LayerNormalization(epsilon=1e-6)(attention_output + x)
+    ffn = layers.Dense(ffn_units, activation='relu')(attention_output)
+    ffn_output = layers.Dense(embedding_dim)(ffn)
+    ffn_output = layers.Dropout(dropout_rate)(ffn_output)
+    ffn_output = layers.LayerNormalization(epsilon=1e-6)(ffn_output + attention_output)
+    x = layers.GlobalAveragePooling1D()(ffn_output)
+    outputs = layers.Dense(output_dim, activation="softmax")(x)
+
+    model = models.Model(inputs=[inputs, attention_mask], outputs=outputs)
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+        loss="sparse_categorical_crossentropy",
+        metrics=["accuracy"],
+        weighted_metrics=["accuracy"]
+    )
+    return model
+
+def define_gpt_model(seq_length, vocab_size, learning_rate, embedding_dim=64, num_heads=8, ffn_units=2048, dropout_rate=0.1):
     inputs = tf.keras.layers.Input(shape=(seq_length,), name='input_1')
     attention_mask = tf.keras.layers.Input(shape=(seq_length,), dtype=tf.float32, name='attention_mask')
 
-    embedding_layer = tf.keras.layers.Embedding(input_dim=output_dim, output_dim=embedding_dim, mask_zero=True)(inputs)
+    embedding_layer = tf.keras.layers.Embedding(input_dim=vocab_size, output_dim=embedding_dim, mask_zero=True)(inputs)
     
-    # マスクなしのSelf-Attention層
     attention_layer = CustomMultiHeadAttention(num_heads=num_heads, key_dim=embedding_dim)(embedding_layer, embedding_layer, attention_mask=attention_mask)
     
     add_norm_layer = tf.keras.layers.Add()([embedding_layer, attention_layer])
@@ -108,7 +107,7 @@ def define_gpt_model(seq_length, output_dim, learning_rate, embedding_dim=64, nu
     norm_layer2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)(add_norm_layer2)
     
     gap_layer = tf.keras.layers.GlobalAveragePooling1D()(norm_layer2)
-    outputs = tf.keras.layers.Dense(output_dim, activation="softmax")(gap_layer)  # 出力層をsoftmaxに変更
+    outputs = tf.keras.layers.Dense(vocab_size, activation="softmax")(gap_layer)  # vocab_sizeを使用
 
     model = tf.keras.Model(inputs=[inputs, attention_mask], outputs=outputs)
 
@@ -121,8 +120,6 @@ def define_gpt_model(seq_length, output_dim, learning_rate, embedding_dim=64, nu
     )
 
     return model
-
-
 
 
 

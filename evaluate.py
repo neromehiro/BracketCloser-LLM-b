@@ -11,6 +11,7 @@ from typing import List
 import sys
 from datetime import datetime
 from modules.data_generator import generate_test_data, preprocess_and_save_dataset
+from modules.custom_layers import CustomMultiHeadAttention
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'modules'))
 
@@ -78,15 +79,7 @@ tokens = ["(", ")", "【", "】", "{", "}", "input", ",output", ","]
 token2id = {token: i + 1 for i, token in enumerate(tokens)}
 id2token = {i + 1: token for i, token in enumerate(tokens)}
 
-# CustomMultiHeadAttentionの定義
-class CustomMultiHeadAttention(MultiHeadAttention):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-    
-    def call(self, query, value, key=None, attention_mask=None, return_attention_scores=False, training=None, **kwargs):
-        if isinstance(attention_mask, list):
-            attention_mask = tf.convert_to_tensor(attention_mask, dtype=tf.float32)
-        return super().call(query, value, key=key, attention_mask=attention_mask, return_attention_scores=return_attention_scores, training=training)
+
 
 # モデルメタデータをロードしてモデルの種類を自動設定
 def get_model_type(metadata_path: str) -> str:

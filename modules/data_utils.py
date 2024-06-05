@@ -7,10 +7,10 @@ import numpy as np
 # 括弧の種類とキーワード
 tokens = ["(", ")", "【", "】", "{", "}", "input", ",output", ","]
 
-# トークンとIDを対応付ける辞書
+# トークンとIDを対応付ける辞書 ID0はパディング用
 token2id = {token: i + 1 for i, token in enumerate(tokens)}
 
-# IDとトークンを対応付ける辞書
+# IDとトークンを対応付ける辞書 ID0はパディング用
 id2token = {i + 1: token for i, token in enumerate(tokens)}
 
 def load_dataset(filepath):
