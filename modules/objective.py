@@ -5,6 +5,9 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 from modules.model_utils import define_gru_model, define_transformer_model, define_lstm_model, define_bert_model, define_gpt_model
 from modules.data_utils import load_dataset, tokens
 from modules.training_utils import train_model
+import wandb
+from modules.setup import setup, parse_time_limit
+import datetime
 
 MODEL_ARCHITECTURES = {
     "gru": define_gru_model,
@@ -13,6 +16,10 @@ MODEL_ARCHITECTURES = {
     "bert": define_bert_model,
     "gpt": define_gpt_model
 }
+
+# 環境変数設定
+os.environ["WANDB_CONSOLE"] = "off"
+os.environ["WANDB_SILENT"] = "true"
 
 def prepare_sequences(encoded_tokens, seq_length):
     input_sequences = []
@@ -31,15 +38,17 @@ def prepare_sequences(encoded_tokens, seq_length):
 
     return input_sequences, target_tokens
 
-def objective(trial, architecture, best_loss, encode_dir_path, create_save_folder_func, trial_number):
+
+
+def objective(trial, architecture, best_loss, encode_dir_path, create_save_folder_func):
     model_architecture_func = MODEL_ARCHITECTURES[architecture]
     
-    if trial_number == 0:
+    if trial.number == 0:
         epochs = trial.suggest_int("epochs", 2, 4)
     else:
-        epochs = trial.suggest_int("epochs", 1, 10)
+        epochs = trial.suggest_int("epochs", 1, 50)
     
-    batch_size = trial.suggest_int("batch_size", 32, 1024)
+    batch_size = trial.suggest_int("batch_size", 32, 256)
     learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-1, log=True)
     seq_length = 30
 
@@ -105,7 +114,9 @@ def objective(trial, architecture, best_loss, encode_dir_path, create_save_folde
     all_target_tokens = np.array(all_target_tokens)
 
     save_path = create_save_folder_func()
-    temp_model_path = os.path.join(save_path, f"temp_model_{trial.number}.h5")
+    timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+    temp_model_path = os.path.join(save_path, f"temp_model_{trial.number}_{timestamp}.h5")
+    os.makedirs(os.path.dirname(temp_model_path), exist_ok=True)
 
     try:
         history, dataset_size = train_model(
@@ -128,9 +139,12 @@ def objective(trial, architecture, best_loss, encode_dir_path, create_save_folde
             loss = history.history['loss'][-1]
             if loss < best_loss:
                 best_loss = loss
-                model.save(os.path.join(save_path, "best_model.h5"))
+                best_model_path = os.path.join(save_path, f"best_model_{trial.number}_{timestamp}.h5")
+                os.makedirs(os.path.dirname(best_model_path), exist_ok=True)
+                model.save(best_model_path)
                 print(f"New best model saved with loss: {best_loss}")
             return loss
     except Exception as e:
         print(f"Training failed with exception: {e}. Returning inf loss.")
         return float('inf')
+

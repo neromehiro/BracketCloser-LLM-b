@@ -23,7 +23,6 @@ best_loss = float('inf')
 # 環境変数設定
 os.environ["WANDB_CONSOLE"] = "off"
 os.environ["WANDB_SILENT"] = "true"
-
 def main():
     global model_architecture_func, architecture, best_loss
     
@@ -85,11 +84,13 @@ def main():
     save_path = os.path.join(storage_base_path, "hyper_" + architecture_name)
 
     try:
-        study.optimize(lambda trial: objective(trial, architecture, best_loss, encode_dir_path, lambda: save_path, trial.number), n_trials=n_jobs, n_jobs=n_jobs, timeout=trial_timeout, callbacks=[callback])
+        study.optimize(lambda trial: objective(trial, architecture, best_loss, encode_dir_path, lambda: save_path), n_trials=n_jobs, n_jobs=n_jobs, timeout=trial_timeout, callbacks=[callback])
     except Exception as e:
         print(f"An exception occurred during optimization: {e}")
     finally:
         progress_bar.close()
+
+
 
     print("Best hyperparameters: ", study.best_params)
     print("Best loss: ", study.best_value)
@@ -207,8 +208,6 @@ def main():
     print(f"Training finished.")
     print(f"Model size: {model_size:.2f} MB")
     print(f"Model parameters: {model_params}")
-
-
 
 if __name__ == "__main__":
     main()
