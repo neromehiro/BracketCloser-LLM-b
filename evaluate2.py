@@ -15,7 +15,8 @@ from modules.custom_layers import CustomMultiHeadAttention
 # モデルの保存パス
 # model_save_path = 'optuna_studies/hyper_gpt/temp_model_1.h5'
 # model_save_path = 'optuna_studies/hyper_gpt/temp_model_2.h5'
-model_save_path = 'optuna_studies/hyper_gru/temp_model_29.h5'
+# model_save_path = 'optuna_studies/hyper_gru/temp_model_27.h5' # 70パーセント以上
+model_save_path = 'optuna_studies/hyper_gru/temp_model_14.h5' # 70パーセント以上
 
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'modules'))

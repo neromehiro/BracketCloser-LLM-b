@@ -41,6 +41,7 @@ class TrainingHistory(tf.keras.callbacks.Callback):
         with open(metadata_path, 'w') as f:
             json.dump(metadata, f, indent=4)
 
+
 class TimeHistory(Callback):
     def on_train_begin(self, logs={}):
         self.times = []

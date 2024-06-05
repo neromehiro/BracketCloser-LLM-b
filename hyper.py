@@ -1,4 +1,3 @@
-
 import optuna
 import os
 import numpy as np
@@ -57,7 +56,9 @@ def main():
         model_architecture_func, architecture = setup(architecture_name)
 
         # 新しいフォルダを作成
-        save_path = create_save_folder(storage_base_path, "hyper_" + architecture)  # create_save_folder を使用
+        save_path = os.path.join(storage_base_path, "hyper_" + architecture_name)
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
         study_name = os.path.basename(save_path)
         storage_name = f"sqlite:///{save_path}/optuna_study.db"
 
@@ -85,10 +86,6 @@ def main():
             progress_bar.close()
             print("Time limit exceeded, stopping optimization.")
             study.stop()
-
-    save_path = os.path.join(storage_base_path, "hyper_" + architecture)
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
 
     # 並列実行の設定を追加
     n_jobs = int(input("Enter the number of parallel jobs: ").strip())

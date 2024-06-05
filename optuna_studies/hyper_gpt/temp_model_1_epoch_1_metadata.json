@@ -1,13 +1,13 @@
 {
     "epoch": 1,
     "logs": {
-        "loss": 0.8588258028030396,
-        "accuracy": 0.14568965137004852,
-        "weighted_accuracy": 0.32740190625190735,
-        "val_loss": 0.7912492156028748,
-        "val_accuracy": 0.1601223647594452,
-        "val_weighted_accuracy": 0.358173668384552
+        "loss": 0.7863135933876038,
+        "accuracy": 0.14788654446601868,
+        "weighted_accuracy": 0.3343812823295593,
+        "val_loss": 0.749835729598999,
+        "val_accuracy": 0.15945495665073395,
+        "val_weighted_accuracy": 0.3540380299091339
     },
-    "time": "2024-06-05 08:57:26",
+    "time": "2024-06-05 10:30:46",
     "model_architecture": "define_gpt_model"
 }
