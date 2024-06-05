@@ -1,3 +1,4 @@
+# modules/objective.py
 import numpy as np
 import os
 from tensorflow.keras.preprocessing.sequence import pad_sequences
@@ -33,17 +34,15 @@ def prepare_sequences(encoded_tokens, seq_length):
 def objective(trial, architecture, best_loss, encode_dir_path, create_save_folder_func, trial_number):
     model_architecture_func = MODEL_ARCHITECTURES[architecture]
     
-    # 最初のトライアルの場合、エポック数を制限
     if trial_number == 0:
         epochs = trial.suggest_int("epochs", 2, 4)
     else:
-        epochs = trial.suggest_int("epochs", 1, 100)
+        epochs = trial.suggest_int("epochs", 1, 10)
     
     batch_size = trial.suggest_int("batch_size", 32, 1024)
     learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-1, log=True)
-    seq_length = 30  # シーケンス長を30に設定
+    seq_length = 30
 
-    # モデル固有のハイパーパラメータ
     if architecture == "gru":
         embedding_dim = trial.suggest_int("embedding_dim", 32, 256)
         gru_units = trial.suggest_int("gru_units", 32, 256)
@@ -86,7 +85,7 @@ def objective(trial, architecture, best_loss, encode_dir_path, create_save_folde
     all_target_tokens = []
 
     num_datasets = 0
-    num_files = 10  # num_filesを増やす
+    num_files = 10
 
     for dirpath, dirnames, filenames in os.walk(encode_dir_path):
         for file in filenames[:num_files]:
@@ -108,28 +107,30 @@ def objective(trial, architecture, best_loss, encode_dir_path, create_save_folde
     save_path = create_save_folder_func()
     temp_model_path = os.path.join(save_path, f"temp_model_{trial.number}.h5")
 
-    # モデルの訓練
-    history, dataset_size = train_model(
-        model, 
-        all_input_sequences, 
-        all_target_tokens, 
-        epochs=epochs, 
-        batch_size=batch_size, 
-        model_path=temp_model_path, 
-        num_files=num_files, 
-        learning_rate=learning_rate, 
-        architecture=architecture, 
-        model_architecture_func=model_architecture_func  # 追加された引数
-    )
-    
-    # ベストモデルの評価
-    if isinstance(history, list):
-        print("Training failed. Returning inf loss.")
+    try:
+        history, dataset_size = train_model(
+            model, 
+            all_input_sequences, 
+            all_target_tokens, 
+            epochs=epochs, 
+            batch_size=batch_size, 
+            model_path=temp_model_path, 
+            num_files=num_files, 
+            learning_rate=learning_rate, 
+            architecture=architecture, 
+            model_architecture_func=model_architecture_func
+        )
+        
+        if isinstance(history, list):
+            print("Training failed with list return. Returning inf loss.")
+            return float('inf')
+        else:
+            loss = history.history['loss'][-1]
+            if loss < best_loss:
+                best_loss = loss
+                model.save(os.path.join(save_path, "best_model.h5"))
+                print(f"New best model saved with loss: {best_loss}")
+            return loss
+    except Exception as e:
+        print(f"Training failed with exception: {e}. Returning inf loss.")
         return float('inf')
-    else:
-        loss = history.history['loss'][-1]
-        if loss < best_loss:
-            best_loss = loss
-            model.save(os.path.join(save_path, "best_model.h5"))
-            print(f"New best model saved with loss: {best_loss}")
-        return loss

@@ -27,11 +27,9 @@ os.environ["WANDB_SILENT"] = "true"
 def main():
     global model_architecture_func, architecture, best_loss
     
-    # 再開するか新規開始かを選択
     option = input("Choose an option:\n1. Resume existing study\n2. Start a new study\nEnter 1 or 2: ").strip()
     
     if option == "1":
-        # 再開する場合
         studies = [f for f in os.listdir(storage_base_path) if f.startswith("hyper_")]
         if not studies:
             print("No existing studies found. Starting a new study.")
@@ -43,19 +41,16 @@ def main():
             study_folder = studies[study_index]
             study_name = study_folder
 
-            # architecture_name をフォルダ名から抽出するロジックを変更
-            architecture_name_parts = study_folder.split('_')[1:]  # 最初の "hyper_" を除外
+            architecture_name_parts = study_folder.split('_')[1:]
             architecture_name = "_".join(architecture_name_parts)
 
             storage_name = f"sqlite:///{storage_base_path}/{study_folder}/optuna_study.db"
             model_architecture_func, architecture = setup(architecture_name)
 
     if option == "2":
-        # 新規開始の場合
         architecture_name = input("Enter the model architecture (gru, transformer, lstm, bert, gpt): ").strip()
         model_architecture_func, architecture = setup(architecture_name)
 
-        # 新しいフォルダを作成
         save_path = os.path.join(storage_base_path, "hyper_" + architecture_name)
         if not os.path.exists(save_path):
             os.makedirs(save_path)
@@ -66,10 +61,8 @@ def main():
     time_limit = parse_time_limit(time_limit_str)
     start_time = datetime.now()
 
-    # トライアルの時間制限を設定（例：各トライアルに最大60秒）
-    trial_timeout = 60  # 秒単位
+    trial_timeout = 60
 
-    # Optunaのストレージを設定
     study = optuna.create_study(
         study_name=study_name, 
         direction="minimize", 
@@ -87,10 +80,10 @@ def main():
             print("Time limit exceeded, stopping optimization.")
             study.stop()
 
-    # 並列実行の設定を追加
     n_jobs = int(input("Enter the number of parallel jobs: ").strip())
-    
-    # トライアルの最適化
+
+    save_path = os.path.join(storage_base_path, "hyper_" + architecture_name)
+
     try:
         study.optimize(lambda trial: objective(trial, architecture, best_loss, encode_dir_path, lambda: save_path, trial.number), n_trials=n_jobs, n_jobs=n_jobs, timeout=trial_timeout, callbacks=[callback])
     except Exception as e:
@@ -101,14 +94,12 @@ def main():
     print("Best hyperparameters: ", study.best_params)
     print("Best loss: ", study.best_value)
 
-    # ベストパラメータで再トレーニングして保存
     best_params = study.best_params
     epochs = best_params["epochs"]
     batch_size = best_params["batch_size"]
     learning_rate = best_params["learning_rate"]
-    seq_length = 30  # シーケンス長を設定
+    seq_length = 30
 
-    # モデル固有のベストパラメータの取得
     if architecture == "gru":
         embedding_dim = best_params["embedding_dim"]
         gru_units = best_params["gru_units"]
@@ -151,7 +142,7 @@ def main():
     all_target_tokens = []
 
     num_datasets = 0
-    num_files = 10  # num_filesを増やす
+    num_files = 10
 
     for dirpath, dirnames, filenames in os.walk(encode_dir_path):
         for file in filenames[:num_files]:
@@ -174,7 +165,7 @@ def main():
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
-    mirrored_strategy = tf.distribute.MirroredStrategy()  # 分散学習の設定を追加
+    mirrored_strategy = tf.distribute.MirroredStrategy()
 
     with mirrored_strategy.scope():
         model = model_architecture_func(seq_length, len(tokens) + 1, learning_rate, embedding_dim, num_heads, ffn_units, dropout_rate)
@@ -192,13 +183,13 @@ def main():
         num_files=num_files, 
         learning_rate=learning_rate, 
         architecture=architecture, 
-        model_architecture_func=model_architecture_func  # 追加された引数
+        model_architecture_func=model_architecture_func
     )
     
     if history:
         plot_training_history(history, save_path=plot_path, epochs=epochs, batch_size=batch_size, learning_rate=learning_rate, num_files=num_files, dataset_size=dataset_size)
 
-    model_size = os.path.getsize(model_path) / (1024 * 1024)  # MB単位に変換
+    model_size = os.path.getsize(model_path) / (1024 * 1024)
     model_params = model.count_params()
 
     metadata = {
@@ -216,6 +207,8 @@ def main():
     print(f"Training finished.")
     print(f"Model size: {model_size:.2f} MB")
     print(f"Model parameters: {model_params}")
+
+
 
 if __name__ == "__main__":
     main()

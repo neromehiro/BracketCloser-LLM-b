@@ -52,7 +52,7 @@ TRAINING_MODES = {
     "2days": {"epochs": 160, "batch_size": 1024, "num_files": 2400, "learning_rate": 0.0005},
     "4days": {"epochs": 320, "batch_size": 1024, "num_files": 4800, "learning_rate": 0.0005},
     "optuna_best": {  #
-        "epochs": 30,
+        "epochs": 5,
         "batch_size": 796,
         "num_files": 5,  # ファイル数は仮に設定
         "learning_rate": 0.003639504540140406,

@@ -10,5 +10,5 @@ def list_studies(storage_name: str):
         print(f" - {study_summary.study_name}")
 
 if __name__ == "__main__":
-    storage_name = "sqlite:///optuna_studies/hyper_gru/optuna_study.db"  # 使用しているストレージのパス
+    storage_name = "sqlite:///optuna_studies/hyper_gpt/optuna_study.db"  # 使用しているストレージのパス
     list_studies(storage_name)
