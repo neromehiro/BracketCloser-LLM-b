@@ -13,6 +13,8 @@ from modules.data_generator import generate_test_data, preprocess_and_save_datas
 from modules.custom_layers import CustomMultiHeadAttention
 
 # モデルの保存パス
+# model_save_path = 'optuna_studies/hyper_gpt/temp_model_1.h5'
+# model_save_path = 'optuna_studies/hyper_gpt/temp_model_2.h5'
 model_save_path = 'optuna_studies/hyper_gru/temp_model_29.h5'
 
 
