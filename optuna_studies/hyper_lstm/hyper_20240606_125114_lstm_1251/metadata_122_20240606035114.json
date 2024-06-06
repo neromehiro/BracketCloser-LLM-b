@@ -1,0 +1,21 @@
+{
+    "epoch": 5,
+    "logs": {
+        "loss": 0.7247999310493469,
+        "accuracy": 0.20517241954803467,
+        "weighted_accuracy": 0.462135910987854,
+        "val_loss": 0.7433367371559143,
+        "val_accuracy": 0.22887931764125824,
+        "val_weighted_accuracy": 0.4844890534877777
+    },
+    "time": "20240606035114",
+    "model_architecture": "define_lstm_model",
+    "batch_size": 169,
+    "epochs": 5,
+    "learning_rate": 0.00025139296671336764,
+    "embedding_dim": 340,
+    "gru_units": null,
+    "dropout_rate": 0.43364509615763136,
+    "recurrent_dropout_rate": null,
+    "num_layers": 1
+}

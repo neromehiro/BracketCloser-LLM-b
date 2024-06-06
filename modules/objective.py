@@ -1,3 +1,4 @@
+
 # modules/objective.py
 import numpy as np
 import os
@@ -18,7 +19,6 @@ MODEL_ARCHITECTURES = {
     "gpt": define_gpt_model
 }
 
-# 環境変数設定
 os.environ["WANDB_CONSOLE"] = "off"
 os.environ["WANDB_SILENT"] = "true"
 
@@ -26,92 +26,37 @@ def prepare_sequences(encoded_tokens, seq_length):
     input_sequences = []
     target_tokens = []
 
-    # エンコードされたトークンを用いてシーケンスを作成
     for i in range(1, len(encoded_tokens)):
         input_seq = encoded_tokens[:i]
         target_seq = encoded_tokens[i]
         input_sequences.append(input_seq)
         target_tokens.append(target_seq)
 
-    # シーケンスの長さを揃えるためにパディングを追加
-    input_sequences = pad_sequences(input_sequences, maxlen=seq_length, padding='post', value=0)  # パディング値を0に設定
+    input_sequences = pad_sequences(input_sequences, maxlen=seq_length, padding='post', value=0)
     target_tokens = pad_sequences([target_tokens], maxlen=len(input_sequences), padding='post', value=0)[0]
 
     return input_sequences, target_tokens
 
-
-
-import datetime
-import json
-
 def objective(trial, architecture, best_loss, encode_dir_path, create_save_folder_func):
     model_architecture_func = MODEL_ARCHITECTURES[architecture]
     
-    if trial.number == 0:
-        epochs = trial.suggest_int("epochs", 2, 4)
-    else:
-        epochs = trial.suggest_int("epochs", 1, 10)
-    
+    epochs = trial.suggest_int("epochs", 1, 10) if trial.number != 0 else trial.suggest_int("epochs", 2, 4)
     batch_size = trial.suggest_int("batch_size", 32, 256)
     learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-1, log=True)
     seq_length = 30
 
     if architecture == "gru":
-        embedding_dim = trial.suggest_int("embedding_dim", 32, 256)
-        gru_units = trial.suggest_int("gru_units", 32, 256)
-        dropout_rate = trial.suggest_float("dropout_rate", 0.0, 0.5)
-        recurrent_dropout_rate = trial.suggest_float("recurrent_dropout_rate", 0.0, 0.5)
-        model = model_architecture_func(seq_length, len(tokens) + 1, learning_rate, embedding_dim, gru_units, dropout_rate, recurrent_dropout_rate)
-    
+        model = model_architecture_func(seq_length, len(tokens) + 1, learning_rate, trial.suggest_int("embedding_dim", 32, 256), trial.suggest_int("gru_units", 32, 256), trial.suggest_float("dropout_rate", 0.0, 0.5), trial.suggest_float("recurrent_dropout_rate", 0.0, 0.5))
     elif architecture == "transformer":
-        embedding_dim = trial.suggest_int("embedding_dim", 32, 256)
-        num_heads = trial.suggest_int("num_heads", 2, 8)
-        ffn_units = trial.suggest_int("ffn_units", 64, 512)
-        dropout_rate = trial.suggest_float("dropout_rate", 0.0, 0.5)
-        model = model_architecture_func(seq_length, len(tokens) + 1, learning_rate, embedding_dim, num_heads, ffn_units, dropout_rate)
-    
+        model = model_architecture_func(seq_length, len(tokens) + 1, learning_rate, trial.suggest_int("embedding_dim", 32, 256), trial.suggest_int("num_heads", 2, 8), trial.suggest_int("ffn_units", 64, 512), trial.suggest_float("dropout_rate", 0.0, 0.5))
     elif architecture == "lstm":
-        embedding_dim = trial.suggest_int("embedding_dim", 32, 512)
-        lstm_units = trial.suggest_int("lstm_units", 32, 512)
-        dropout_rate = trial.suggest_float("dropout_rate", 0.0, 0.5)
-        recurrent_dropout_rate = trial.suggest_float("recurrent_dropout_rate", 0.0, 0.5)
-        num_layers = trial.suggest_int("num_layers", 1, 5)
-        model = model_architecture_func(seq_length, len(tokens) + 1, learning_rate, embedding_dim, lstm_units, dropout_rate, recurrent_dropout_rate, num_layers)
-    
+        model = model_architecture_func(seq_length, len(tokens) + 1, learning_rate, trial.suggest_int("embedding_dim", 32, 512), trial.suggest_int("lstm_units", 32, 512), trial.suggest_float("dropout_rate", 0.0, 0.5), trial.suggest_float("recurrent_dropout_rate", 0.0, 0.5), trial.suggest_int("num_layers", 1, 5))
     elif architecture == "bert":
-        embedding_dim = trial.suggest_int("embedding_dim", 32, 256)
-        num_heads = trial.suggest_int("num_heads", 2, 8)
-        ffn_units = trial.suggest_int("ffn_units", 64, 512)
-        num_layers = trial.suggest_int("num_layers", 1, 4)
-        dropout_rate = trial.suggest_float("dropout_rate", 0.0, 0.5)
-        model = model_architecture_func(seq_length, len(tokens) + 1, learning_rate, embedding_dim, num_heads, ffn_units, num_layers, dropout_rate)
-    
+        model = model_architecture_func(seq_length, len(tokens) + 1, learning_rate, trial.suggest_int("embedding_dim", 32, 256), trial.suggest_int("num_heads", 2, 8), trial.suggest_int("ffn_units", 64, 512), trial.suggest_int("num_layers", 1, 4), trial.suggest_float("dropout_rate", 0.0, 0.5))
     elif architecture == "gpt":
-        embedding_dim = trial.suggest_int("embedding_dim", 32, 256)
-        num_heads = trial.suggest_int("num_heads", 2, 8)
-        ffn_units = trial.suggest_int("ffn_units", 64, 512)
-        dropout_rate = trial.suggest_float("dropout_rate", 0.0, 0.5)
-        model = model_architecture_func(seq_length, len(tokens) + 1, learning_rate, embedding_dim, num_heads, ffn_units, dropout_rate)
+        model = model_architecture_func(seq_length, len(tokens) + 1, learning_rate, trial.suggest_int("embedding_dim", 32, 256), trial.suggest_int("num_heads", 2, 8), trial.suggest_int("ffn_units", 64, 512), trial.suggest_float("dropout_rate", 0.0, 0.5))
 
-    vocab_set = set(tokens)
-    all_input_sequences = []
-    all_target_tokens = []
-
-    num_datasets = 0
-    num_files = 10
-
-    for dirpath, dirnames, filenames in os.walk(encode_dir_path):
-        for file in filenames[:num_files]:
-            file_path = os.path.join(dirpath, file)
-            encoded_tokens_list = load_dataset(file_path)
-            if encoded_tokens_list is None:
-                print(f"Skipping file {file} as it contains no data")
-                continue
-            for encoded_tokens in encoded_tokens_list:
-                num_datasets += 1
-                input_sequences, target_tokens = prepare_sequences(encoded_tokens, seq_length=seq_length)
-                all_input_sequences.extend(input_sequences)
-                all_target_tokens.extend(target_tokens)
+    all_input_sequences, all_target_tokens = load_training_data(encode_dir_path, seq_length, 10)
 
     if not all_input_sequences or not all_target_tokens:
         print("No data for training.")
@@ -133,7 +78,7 @@ def objective(trial, architecture, best_loss, encode_dir_path, create_save_folde
             epochs=epochs, 
             batch_size=batch_size, 
             model_path=temp_model_path, 
-            num_files=num_files, 
+            num_files=10, 
             learning_rate=learning_rate, 
             architecture=architecture, 
             model_architecture_func=model_architecture_func
@@ -166,11 +111,11 @@ def objective(trial, architecture, best_loss, encode_dir_path, create_save_folde
                     "batch_size": batch_size,
                     "epochs": epochs,
                     "learning_rate": learning_rate,
-                    "embedding_dim": embedding_dim,
-                    "gru_units": gru_units if architecture == 'gru' else None,
-                    "dropout_rate": dropout_rate,
-                    "recurrent_dropout_rate": recurrent_dropout_rate if architecture == 'gru' else None,
-                    "num_layers": num_layers if architecture in ['lstm', 'bert'] else None
+                    "embedding_dim": trial.suggest_int("embedding_dim", 32, 256),
+                    "gru_units": trial.suggest_int("gru_units", 32, 256) if architecture == 'gru' else None,
+                    "dropout_rate": trial.suggest_float("dropout_rate", 0.0, 0.5),
+                    "recurrent_dropout_rate": trial.suggest_float("recurrent_dropout_rate", 0.0, 0.5) if architecture == 'gru' else None,
+                    "num_layers": trial.suggest_int("num_layers", 1, 5) if architecture in ['lstm', 'bert'] else None
                 }
                 
                 metadata_path = os.path.join(save_path, f"metadata_{trial.number}_{timestamp}.json")
@@ -181,3 +126,20 @@ def objective(trial, architecture, best_loss, encode_dir_path, create_save_folde
     except Exception as e:
         print(f"Training failed with exception: {e}. Returning inf loss.")
         return float('inf')
+
+def load_training_data(encode_dir_path, seq_length, num_files):
+    all_input_sequences = []
+    all_target_tokens = []
+
+    for dirpath, _, filenames in os.walk(encode_dir_path):
+        for file in filenames[:num_files]:
+            file_path = os.path.join(dirpath, file)
+            encoded_tokens_list = load_dataset(file_path)
+            if encoded_tokens_list is None:
+                continue
+            for encoded_tokens in encoded_tokens_list:
+                input_sequences, target_tokens = prepare_sequences(encoded_tokens, seq_length=seq_length)
+                all_input_sequences.extend(input_sequences)
+                all_target_tokens.extend(target_tokens)
+
+    return all_input_sequences, all_target_tokens

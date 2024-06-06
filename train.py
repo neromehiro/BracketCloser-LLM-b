@@ -7,7 +7,7 @@ from datetime import datetime
 import pytz
 from modules.data_utils import load_dataset, prepare_sequences, tokens, token2id
 from modules.model_utils import define_gru_model, define_transformer_model, define_lstm_model, define_bert_model, define_gpt_model
-from modules.training_utils import train_model, plot_training_history, save_metadata
+from modules.training_utils import   train_model_single, plot_training_history, save_metadata
 from modules.custom_layers import CustomMultiHeadAttention
 from tensorflow.keras.preprocessing.sequence import pad_sequences 
 
@@ -205,7 +205,7 @@ def main():
     plot_path = os.path.join(temp_save_dir, "training_history.png")
 
     # モデルの学習
-    history, dataset_size = train_model(
+    history, dataset_size =  train_model_single(
         model, 
         all_input_sequences, 
         all_target_tokens, 
