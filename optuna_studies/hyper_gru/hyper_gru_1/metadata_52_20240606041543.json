@@ -1,0 +1,21 @@
+{
+    "epoch": 8,
+    "logs": {
+        "loss": 0.6962535977363586,
+        "accuracy": 0.1897629350423813,
+        "weighted_accuracy": 0.42742717266082764,
+        "val_loss": 0.7337039709091187,
+        "val_accuracy": 0.20818965137004852,
+        "val_weighted_accuracy": 0.4406934380531311
+    },
+    "time": "20240606041543",
+    "model_architecture": "define_gru_model",
+    "batch_size": 176,
+    "epochs": 8,
+    "learning_rate": 0.0007296025450823397,
+    "embedding_dim": 55,
+    "gru_units": 76,
+    "dropout_rate": 0.4339111180120051,
+    "recurrent_dropout_rate": 0.4141639060169446,
+    "num_layers": null
+}

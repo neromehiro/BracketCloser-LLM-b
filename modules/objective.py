@@ -1,4 +1,3 @@
-
 # modules/objective.py
 import numpy as np
 import os
@@ -7,9 +6,11 @@ from modules.model_utils import define_gru_model, define_transformer_model, defi
 from modules.data_utils import load_dataset, tokens
 from modules.training_utils import train_model
 import wandb
+from wandb.integration.keras import WandbCallback
 from modules.setup import setup, parse_time_limit
 import datetime
 import json
+import tensorflow as tf
 
 MODEL_ARCHITECTURES = {
     "gru": define_gru_model,
@@ -36,6 +37,23 @@ def prepare_sequences(encoded_tokens, seq_length):
     target_tokens = pad_sequences([target_tokens], maxlen=len(input_sequences), padding='post', value=0)[0]
 
     return input_sequences, target_tokens
+
+def load_training_data(encode_dir_path, seq_length, num_files=10):
+    all_input_sequences = []
+    all_target_tokens = []
+
+    for dirpath, _, filenames in os.walk(encode_dir_path):
+        for file in filenames[:num_files]:
+            file_path = os.path.join(dirpath, file)
+            encoded_tokens_list = load_dataset(file_path)
+            if encoded_tokens_list is None:
+                continue
+            for encoded_tokens in encoded_tokens_list:
+                input_sequences, target_tokens = prepare_sequences(encoded_tokens, seq_length=seq_length)
+                all_input_sequences.extend(input_sequences)
+                all_target_tokens.extend(target_tokens)
+
+    return all_input_sequences, all_target_tokens
 
 def objective(trial, architecture, best_loss, encode_dir_path, create_save_folder_func):
     model_architecture_func = MODEL_ARCHITECTURES[architecture]
@@ -81,7 +99,8 @@ def objective(trial, architecture, best_loss, encode_dir_path, create_save_folde
             num_files=10, 
             learning_rate=learning_rate, 
             architecture=architecture, 
-            model_architecture_func=model_architecture_func
+            model_architecture_func=model_architecture_func,
+            callbacks=[WandbCallback(), tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)]
         )
         
         if history is None or isinstance(history, float):
@@ -127,19 +146,3 @@ def objective(trial, architecture, best_loss, encode_dir_path, create_save_folde
         print(f"Training failed with exception: {e}. Returning inf loss.")
         return float('inf')
 
-def load_training_data(encode_dir_path, seq_length, num_files):
-    all_input_sequences = []
-    all_target_tokens = []
-
-    for dirpath, _, filenames in os.walk(encode_dir_path):
-        for file in filenames[:num_files]:
-            file_path = os.path.join(dirpath, file)
-            encoded_tokens_list = load_dataset(file_path)
-            if encoded_tokens_list is None:
-                continue
-            for encoded_tokens in encoded_tokens_list:
-                input_sequences, target_tokens = prepare_sequences(encoded_tokens, seq_length=seq_length)
-                all_input_sequences.extend(input_sequences)
-                all_target_tokens.extend(target_tokens)
-
-    return all_input_sequences, all_target_tokens

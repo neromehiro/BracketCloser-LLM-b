@@ -10,6 +10,7 @@ import numpy as np
 from datetime import datetime  # datetimeモジュールをインポート
 import wandb
 
+
 class WandbCallback(Callback):
     def on_epoch_end(self, epoch, logs=None):
         if logs is not None:
@@ -163,9 +164,13 @@ def train_model_single(model, input_sequences, target_tokens, epochs, batch_size
         print("No data for training.")
         return None, 0
 
-# hyperのためにちょっと変えた
+# hyperの用にした
+
+
+
+
 def train_model(model, input_sequences, target_tokens, epochs, batch_size, model_path, num_files, learning_rate, architecture, model_architecture_func,
-                embedding_dim=64, gru_units=64, dropout_rate=0.2, recurrent_dropout_rate=0.2):
+                embedding_dim=64, gru_units=64, dropout_rate=0.2, recurrent_dropout_rate=0.2, callbacks=None):
     if len(input_sequences) > 0 and len(target_tokens) > 0:
         print(f"Shapes: {input_sequences.shape}, {target_tokens.shape}")
 
@@ -230,10 +235,10 @@ def train_model(model, input_sequences, target_tokens, epochs, batch_size, model
                 train_dataset,
                 epochs=epochs,
                 validation_data=validation_dataset,
-                callbacks=[time_callback, checkpoint_callback, history_callback]
+                callbacks=[time_callback, checkpoint_callback, history_callback] + (callbacks if callbacks else [])
             )
-            model.save(model_path, include_optimizer=False, save_format='h5')
-            return history, len(input_sequences)  # 修正: history_callback.historyからhistoryに変更
+            tf.saved_model.save(model, model_path)  # 修正部分：モデル保存方法を変更
+            return history, len(input_sequences)
         except Exception as e:
             print(f"Training failed with exception: {e}")
             print(f"Learning rate: {learning_rate}, Batch size: {batch_size}, Epochs: {epochs}")

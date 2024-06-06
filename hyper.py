@@ -3,7 +3,7 @@ import optuna
 import os
 import numpy as np
 import tensorflow as tf
-from datetime import datetime, timedelta
+from datetime import datetime
 from tqdm import tqdm
 from modules.setup import setup, parse_time_limit
 from modules.objective import objective
@@ -11,11 +11,19 @@ from modules.utils import create_save_folder
 from modules.data_utils import load_dataset, prepare_sequences, tokens
 from modules.training_utils import train_model, plot_training_history, save_metadata
 import glob
+import wandb
+from wandb.integration.keras import WandbCallback
+from optuna.pruners import HyperbandPruner
+from optuna.samplers import TPESampler
+from dotenv import load_dotenv
 
 ENCODE_DIR_PATH = "./components/dataset/preprocessed/"
 MODEL_SAVE_BASE_PATH = "./models/"
 STORAGE_BASE_PATH = "./optuna_studies/"
 BEST_LOSS = float('inf')
+
+# .envファイルの読み込み
+load_dotenv()
 
 os.environ["WANDB_CONSOLE"] = "off"
 os.environ["WANDB_SILENT"] = "true"
@@ -26,8 +34,52 @@ def clean_up_files(save_path, keep_files=['best_model.h5', 'training_history.png
         if os.path.basename(file) not in keep_files:
             os.remove(file)
 
+def create_model(architecture, best_params, model_architecture_func, seq_length, vocab_size):
+    embedding_dim = best_params["embedding_dim"]
+    dropout_rate = best_params["dropout_rate"]
+    learning_rate = best_params["learning_rate"]
+
+    if architecture == "gru":
+        return model_architecture_func(seq_length, vocab_size + 1, learning_rate, embedding_dim, best_params["gru_units"], dropout_rate, best_params["recurrent_dropout_rate"])
+    elif architecture == "transformer":
+        return model_architecture_func(seq_length, vocab_size + 1, learning_rate, embedding_dim, best_params["num_heads"], best_params["ffn_units"], dropout_rate)
+    elif architecture == "lstm":
+        return model_architecture_func(seq_length, vocab_size + 1, learning_rate, embedding_dim, best_params["lstm_units"], dropout_rate, best_params["recurrent_dropout_rate"], best_params["num_layers"])
+    elif architecture == "bert":
+        return model_architecture_func(seq_length, vocab_size + 1, learning_rate, embedding_dim, best_params["num_heads"], best_params["ffn_units"], best_params["num_layers"], dropout_rate)
+    elif architecture == "gpt":
+        return model_architecture_func(seq_length, vocab_size + 1, learning_rate, embedding_dim, best_params["num_heads"], best_params["ffn_units"], dropout_rate)
+
+def load_training_data(encode_dir_path, seq_length, num_files=10):
+    all_input_sequences = []
+    all_target_tokens = []
+
+    for dirpath, _, filenames in os.walk(encode_dir_path):
+        for file in filenames[:num_files]:
+            file_path = os.path.join(dirpath, file)
+            encoded_tokens_list = load_dataset(file_path)
+            if encoded_tokens_list is None:
+                continue
+            for encoded_tokens in encoded_tokens_list:
+                input_sequences, target_tokens = prepare_sequences(encoded_tokens, seq_length=seq_length)
+                all_input_sequences.extend(input_sequences)
+                all_target_tokens.extend(target_tokens)
+
+    return all_input_sequences, all_target_tokens
+
 def main():
+    wandb_api_key = os.getenv('WANDB_API_KEY')
+    project_name = os.getenv('WANDB_PROJECT_NAME')
+    run_name = os.getenv('WANDB_RUN_NAME')
+
+    if not wandb_api_key or not project_name or not run_name:
+        raise ValueError("WANDB_API_KEY, WANDB_PROJECT_NAME, and WANDB_RUN_NAME must be set as environment variables.")
+
+    wandb.login(key=wandb_api_key)
+    wandb.init(project=project_name, name=run_name)
+
     option = input("Choose an option:\n1. Resume existing study\n2. Start a new study\nEnter 1 or 2: ").strip()
+    
     
     if option == "1":
         studies = [f for f in os.listdir(STORAGE_BASE_PATH) if f.startswith("hyper_")]
@@ -65,6 +117,7 @@ def main():
             progress_bar.close()
             print("Time limit exceeded, stopping optimization.")
             study.stop()
+        wandb.log({'elapsed_time': elapsed_time, 'trial_number': trial.number, 'best_value': study.best_value})
 
     n_jobs = int(input("Enter the number of parallel jobs: ").strip())
 
@@ -73,9 +126,11 @@ def main():
             study_name=study_name, 
             direction="minimize", 
             storage=storage_name, 
-            load_if_exists=True
+            load_if_exists=True,
+            sampler=TPESampler(),
+            pruner=HyperbandPruner(min_resource=1, max_resource="auto")
         )
-        study.optimize(lambda trial: objective(trial, architecture, BEST_LOSS, ENCODE_DIR_PATH, lambda: create_save_folder(save_path, architecture)), timeout=time_limit.total_seconds(), callbacks=[callback])
+        study.optimize(lambda trial: objective(trial, architecture, BEST_LOSS, ENCODE_DIR_PATH, lambda: create_save_folder(save_path, architecture)), timeout=time_limit.total_seconds(), n_jobs=n_jobs, callbacks=[callback])
     except Exception as e:
         print(f"An exception occurred during optimization: {e}")
     finally:
@@ -119,7 +174,8 @@ def main():
         num_files=10, 
         learning_rate=learning_rate, 
         architecture=architecture, 
-        model_architecture_func=model_architecture_func
+        model_architecture_func=model_architecture_func,
+        callbacks=[WandbCallback(), tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)]
     )
     
     if history:
@@ -146,40 +202,7 @@ def main():
     print(f"Model size: {model_size:.2f} MB")
     print(f"Model parameters: {model_params}")
 
-def create_model(architecture, best_params, model_architecture_func, seq_length, vocab_size):
-    embedding_dim = best_params["embedding_dim"]
-    dropout_rate = best_params["dropout_rate"]
-    learning_rate = best_params["learning_rate"]
-
-    if architecture == "gru":
-        return model_architecture_func(seq_length, vocab_size + 1, learning_rate, embedding_dim, best_params["gru_units"], dropout_rate, best_params["recurrent_dropout_rate"])
-    elif architecture == "transformer":
-        return model_architecture_func(seq_length, vocab_size + 1, learning_rate, embedding_dim, best_params["num_heads"], best_params["ffn_units"], dropout_rate)
-    elif architecture == "lstm":
-        return model_architecture_func(seq_length, vocab_size + 1, learning_rate, embedding_dim, best_params["lstm_units"], dropout_rate, best_params["recurrent_dropout_rate"], best_params["num_layers"])
-    elif architecture == "bert":
-        return model_architecture_func(seq_length, vocab_size + 1, learning_rate, embedding_dim, best_params["num_heads"], best_params["ffn_units"], best_params["num_layers"], dropout_rate)
-    elif architecture == "gpt":
-        return model_architecture_func(seq_length, vocab_size + 1, learning_rate, embedding_dim, best_params["num_heads"], best_params["ffn_units"], dropout_rate)
-
-def load_training_data(encode_dir_path, seq_length):
-    all_input_sequences = []
-    all_target_tokens = []
-    num_files = 10
-
-    for dirpath, _, filenames in os.walk(encode_dir_path):
-        for file in filenames[:num_files]:
-            file_path = os.path.join(dirpath, file)
-            encoded_tokens_list = load_dataset(file_path)
-            if encoded_tokens_list is None:
-                continue
-            for encoded_tokens in encoded_tokens_list:
-                input_sequences, target_tokens = prepare_sequences(encoded_tokens, seq_length=seq_length)
-                all_input_sequences.extend(input_sequences)
-                all_target_tokens.extend(target_tokens)
-
-    return all_input_sequences, all_target_tokens
+    wandb.finish()
 
 if __name__ == "__main__":
     main()
-
