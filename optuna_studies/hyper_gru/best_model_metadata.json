@@ -1,0 +1,10 @@
+{
+    "epochs": 2,
+    "batch_size": 796,
+    "num_files": 10,
+    "learning_rate": 0.003639504540140406,
+    "dataset_size": 11600,
+    "model_size_MB": 1.0511932373046875,
+    "model_params": 270550,
+    "model_architecture": "define_gru_model"
+}

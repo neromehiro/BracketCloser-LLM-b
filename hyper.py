@@ -1,3 +1,4 @@
+# hyper.py
 import optuna
 import os
 import numpy as np
@@ -23,12 +24,15 @@ best_loss = float('inf')
 # 環境変数設定
 os.environ["WANDB_CONSOLE"] = "off"
 os.environ["WANDB_SILENT"] = "true"
+
 def main():
     global model_architecture_func, architecture, best_loss
     
+    # 再開するか新規開始かを選択
     option = input("Choose an option:\n1. Resume existing study\n2. Start a new study\nEnter 1 or 2: ").strip()
     
     if option == "1":
+        # 再開する場合
         studies = [f for f in os.listdir(storage_base_path) if f.startswith("hyper_")]
         if not studies:
             print("No existing studies found. Starting a new study.")
@@ -40,13 +44,15 @@ def main():
             study_folder = studies[study_index]
             study_name = study_folder
 
-            architecture_name_parts = study_folder.split('_')[1:]
-            architecture_name = "_".join(architecture_name_parts)
+            # アーキテクチャ名の部分を修正
+            architecture_name_parts = study_folder.split('_')[1:2]
+            architecture_name = architecture_name_parts[0]
 
             storage_name = f"sqlite:///{storage_base_path}/{study_folder}/optuna_study.db"
             model_architecture_func, architecture = setup(architecture_name)
 
     if option == "2":
+        # 新規開始の場合
         architecture_name = input("Enter the model architecture (gru, transformer, lstm, bert, gpt): ").strip()
         model_architecture_func, architecture = setup(architecture_name)
 
@@ -55,7 +61,7 @@ def main():
             os.makedirs(save_path)
         study_name = os.path.basename(save_path)
         storage_name = f"sqlite:///{save_path}/optuna_study.db"
-
+    
     time_limit_str = input("Enter the training time limit (e.g., '3min', '1hour', '5hour'): ").strip()
     time_limit = parse_time_limit(time_limit_str)
     start_time = datetime.now()
@@ -84,23 +90,23 @@ def main():
     save_path = os.path.join(storage_base_path, "hyper_" + architecture_name)
 
     try:
-        study.optimize(lambda trial: objective(trial, architecture, best_loss, encode_dir_path, lambda: save_path), n_trials=n_jobs, n_jobs=n_jobs, timeout=trial_timeout, callbacks=[callback])
+        study.optimize(lambda trial: objective(trial, architecture, best_loss, encode_dir_path, lambda: create_save_folder(storage_base_path, architecture)), timeout=time_limit.total_seconds(), callbacks=[callback])
     except Exception as e:
         print(f"An exception occurred during optimization: {e}")
     finally:
         progress_bar.close()
 
-
-
     print("Best hyperparameters: ", study.best_params)
     print("Best loss: ", study.best_value)
 
+    # ベストパラメータで再トレーニングして保存
     best_params = study.best_params
     epochs = best_params["epochs"]
     batch_size = best_params["batch_size"]
     learning_rate = best_params["learning_rate"]
     seq_length = 30
 
+    # モデル固有のベストパラメータの取得
     if architecture == "gru":
         embedding_dim = best_params["embedding_dim"]
         gru_units = best_params["gru_units"]
@@ -143,12 +149,14 @@ def main():
     all_target_tokens = []
 
     num_datasets = 0
-    num_files = 10
+    num_files = 10  # num_filesを増やす
 
     for dirpath, dirnames, filenames in os.walk(encode_dir_path):
         for file in filenames[:num_files]:
             file_path = os.path.join(dirpath, file)
             encoded_tokens_list = load_dataset(file_path)
+            if encoded_tokens_list is None:
+                continue
             for encoded_tokens in encoded_tokens_list:
                 num_datasets += 1
                 input_sequences, target_tokens = prepare_sequences(encoded_tokens, seq_length=seq_length)
@@ -166,10 +174,10 @@ def main():
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
-    mirrored_strategy = tf.distribute.MirroredStrategy()
+    mirrored_strategy = tf.distribute.MirroredStrategy()  # 分散学習の設定を追加
 
     with mirrored_strategy.scope():
-        model = model_architecture_func(seq_length, len(tokens) + 1, learning_rate, embedding_dim, num_heads, ffn_units, dropout_rate)
+        model = model_architecture_func(seq_length, len(tokens) + 1, embedding_dim, num_heads, ffn_units, dropout_rate, learning_rate)
 
     model_path = os.path.join(save_path, "best_model.h5")
     plot_path = os.path.join(save_path, "training_history.png")
@@ -184,20 +192,20 @@ def main():
         num_files=num_files, 
         learning_rate=learning_rate, 
         architecture=architecture, 
-        model_architecture_func=model_architecture_func
+        model_architecture_func=model_architecture_func  # 追加された引数
     )
     
     if history:
         plot_training_history(history, save_path=plot_path, epochs=epochs, batch_size=batch_size, learning_rate=learning_rate, num_files=num_files, dataset_size=dataset_size)
 
-    model_size = os.path.getsize(model_path) / (1024 * 1024)
+    model_size = os.path.getsize(model_path) / (1024 * 1024)  # MB単位に変換
     model_params = model.count_params()
 
     metadata = {
         "epochs": epochs,
         "batch_size": batch_size,
         "num_files": num_files,
-        "learning_rate": best_params["learning_rate"],
+        "learning_rate": learning_rate,
         "dataset_size": dataset_size,
         "model_size_MB": model_size,
         "model_params": model_params,

@@ -1,0 +1,10 @@
+{
+    "epochs": 2,
+    "batch_size": 185,
+    "num_files": 10,
+    "learning_rate": 0.00011174976779168605,
+    "dataset_size": 11600,
+    "model_size_MB": 0.4320220947265625,
+    "model_params": 103099,
+    "model_architecture": "define_gpt_model"
+}

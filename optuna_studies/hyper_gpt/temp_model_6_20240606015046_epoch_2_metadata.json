@@ -1,0 +1,13 @@
+{
+    "epoch": 2,
+    "logs": {
+        "loss": 0.769408643245697,
+        "accuracy": 0.11314655095338821,
+        "weighted_accuracy": 0.25485438108444214,
+        "val_loss": 0.8332257270812988,
+        "val_accuracy": 0.1142241358757019,
+        "val_weighted_accuracy": 0.2417883276939392
+    },
+    "time": "2024-06-06 01:50:57",
+    "model_architecture": "define_gpt_model"
+}

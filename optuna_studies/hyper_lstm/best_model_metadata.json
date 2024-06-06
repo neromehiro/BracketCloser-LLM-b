@@ -1,0 +1,10 @@
+{
+    "epochs": 2,
+    "batch_size": 93,
+    "num_files": 10,
+    "learning_rate": 0.0003830114706870045,
+    "dataset_size": 11600,
+    "model_size_MB": 2.3933334350585938,
+    "model_params": 622220,
+    "model_architecture": "define_lstm_model"
+}

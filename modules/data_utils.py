@@ -13,9 +13,21 @@ token2id = {token: i + 1 for i, token in enumerate(tokens)}
 # IDとトークンを対応付ける辞書 ID0はパディング用
 id2token = {i + 1: token for i, token in enumerate(tokens)}
 
-def load_dataset(filepath):
-    with open(filepath, "r") as f:
-        return json.load(f)
+import json
+
+def load_dataset(file_path):
+    try:
+        with open(file_path, 'r') as f:
+            data = json.load(f)
+        # データが辞書の場合は値をリストに変換
+        if isinstance(data, dict):
+            data = list(data.values())
+        return data
+    except Exception as e:
+        print(f"Error loading dataset from {file_path}: {e}")
+        return None
+
+
 
 def prepare_sequences(encoded_tokens, seq_length):
     input_sequences = []
@@ -30,4 +42,3 @@ def prepare_sequences(encoded_tokens, seq_length):
             j += 1
 
     return np.array(input_sequences), np.array(target_tokens)
-

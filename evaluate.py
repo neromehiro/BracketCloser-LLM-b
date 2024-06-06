@@ -134,6 +134,8 @@ def tokenize_string(string: str) -> List[str]:
         tokens.append(current_token)
     return tokens
 
+
+
 def preprocess_input(input_seq: str) -> List[int]:
     tokens = tokenize_string(input_seq)
     logging.debug(f"Tokenized string: {tokens}")  # デバッグ: トークン化された文字列をログに記録

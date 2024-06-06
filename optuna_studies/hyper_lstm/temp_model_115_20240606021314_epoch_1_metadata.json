@@ -1,0 +1,13 @@
+{
+    "epoch": 1,
+    "logs": {
+        "loss": 1.0136150121688843,
+        "accuracy": 0.09579741209745407,
+        "weighted_accuracy": 0.20873786509037018,
+        "val_loss": 0.9750550389289856,
+        "val_accuracy": 0.11939655244350433,
+        "val_weighted_accuracy": 0.25273722410202026
+    },
+    "time": "2024-06-06 02:13:46",
+    "model_architecture": "define_lstm_model"
+}

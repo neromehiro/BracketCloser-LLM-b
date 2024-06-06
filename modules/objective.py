@@ -8,6 +8,7 @@ from modules.training_utils import train_model
 import wandb
 from modules.setup import setup, parse_time_limit
 import datetime
+import json
 
 MODEL_ARCHITECTURES = {
     "gru": define_gru_model,
@@ -40,13 +41,16 @@ def prepare_sequences(encoded_tokens, seq_length):
 
 
 
+import datetime
+import json
+
 def objective(trial, architecture, best_loss, encode_dir_path, create_save_folder_func):
     model_architecture_func = MODEL_ARCHITECTURES[architecture]
     
     if trial.number == 0:
         epochs = trial.suggest_int("epochs", 2, 4)
     else:
-        epochs = trial.suggest_int("epochs", 1, 50)
+        epochs = trial.suggest_int("epochs", 1, 10)
     
     batch_size = trial.suggest_int("batch_size", 32, 256)
     learning_rate = trial.suggest_float("learning_rate", 1e-5, 1e-1, log=True)
@@ -143,6 +147,34 @@ def objective(trial, architecture, best_loss, encode_dir_path, create_save_folde
                 os.makedirs(os.path.dirname(best_model_path), exist_ok=True)
                 model.save(best_model_path)
                 print(f"New best model saved with loss: {best_loss}")
+                
+                # メタデータの保存
+                metadata = {
+                    "epoch": len(history.history['loss']),
+                    "logs": {
+                        "loss": history.history['loss'][-1],
+                        "accuracy": history.history.get('accuracy', [None])[-1],
+                        "weighted_accuracy": history.history.get('weighted_accuracy', [None])[-1],
+                        "val_loss": history.history.get('val_loss', [None])[-1],
+                        "val_accuracy": history.history.get('val_accuracy', [None])[-1],
+                        "val_weighted_accuracy": history.history.get('val_weighted_accuracy', [None])[-1]
+                    },
+                    "time": timestamp,
+                    "model_architecture": model_architecture_func.__name__,
+                    "batch_size": batch_size,
+                    "epochs": epochs,
+                    "learning_rate": learning_rate,
+                    "embedding_dim": embedding_dim,
+                    "lstm_units": lstm_units if architecture == 'lstm' else None,
+                    "dropout_rate": dropout_rate,
+                    "recurrent_dropout_rate": recurrent_dropout_rate if architecture == 'lstm' else None,
+                    "num_layers": num_layers if architecture in ['lstm', 'bert'] else None
+                }
+                
+                metadata_path = os.path.join(save_path, f"metadata_{trial.number}_{timestamp}.json")
+                with open(metadata_path, 'w') as f:
+                    json.dump(metadata, f, indent=4)
+                
             return loss
     except Exception as e:
         print(f"Training failed with exception: {e}. Returning inf loss.")
