@@ -104,6 +104,9 @@ def objective(trial, architecture, best_loss, encode_dir_path, create_save_folde
         for file in filenames[:num_files]:
             file_path = os.path.join(dirpath, file)
             encoded_tokens_list = load_dataset(file_path)
+            if encoded_tokens_list is None:
+                print(f"Skipping file {file} as it contains no data")
+                continue
             for encoded_tokens in encoded_tokens_list:
                 num_datasets += 1
                 input_sequences, target_tokens = prepare_sequences(encoded_tokens, seq_length=seq_length)
@@ -136,8 +139,8 @@ def objective(trial, architecture, best_loss, encode_dir_path, create_save_folde
             model_architecture_func=model_architecture_func
         )
         
-        if isinstance(history, list):
-            print("Training failed with list return. Returning inf loss.")
+        if history is None or isinstance(history, float):
+            print("Training failed with invalid return. Returning inf loss.")
             return float('inf')
         else:
             loss = history.history['loss'][-1]
@@ -148,7 +151,6 @@ def objective(trial, architecture, best_loss, encode_dir_path, create_save_folde
                 model.save(best_model_path)
                 print(f"New best model saved with loss: {best_loss}")
                 
-                # メタデータの保存
                 metadata = {
                     "epoch": len(history.history['loss']),
                     "logs": {
@@ -165,9 +167,9 @@ def objective(trial, architecture, best_loss, encode_dir_path, create_save_folde
                     "epochs": epochs,
                     "learning_rate": learning_rate,
                     "embedding_dim": embedding_dim,
-                    "lstm_units": lstm_units if architecture == 'lstm' else None,
+                    "gru_units": gru_units if architecture == 'gru' else None,
                     "dropout_rate": dropout_rate,
-                    "recurrent_dropout_rate": recurrent_dropout_rate if architecture == 'lstm' else None,
+                    "recurrent_dropout_rate": recurrent_dropout_rate if architecture == 'gru' else None,
                     "num_layers": num_layers if architecture in ['lstm', 'bert'] else None
                 }
                 
@@ -179,4 +181,3 @@ def objective(trial, architecture, best_loss, encode_dir_path, create_save_folde
     except Exception as e:
         print(f"Training failed with exception: {e}. Returning inf loss.")
         return float('inf')
-

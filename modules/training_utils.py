@@ -42,16 +42,19 @@ class WandbCallback(Callback):
 
 # hyperのためにクラスの保存方法を変えた
 class TrainingHistory(tf.keras.callbacks.Callback):
-    def __init__(self, model_path, model_architecture_func):
+    def __init__(self, model_path, model_architecture_func, save_interval=5):
         super().__init__()
         self.model_path = model_path
         self.model_architecture_func = model_architecture_func
         self.history = []
+        self.save_interval = save_interval
 
     def on_epoch_end(self, epoch, logs=None):
         logs = logs or {}
         self.history.append(logs.copy())
-        self.save_metadata(epoch, logs)
+        if (epoch + 1) % self.save_interval == 0:
+            self.save_metadata(epoch, logs)
+            self.save_model_checkpoint(epoch)
 
     def save_metadata(self, epoch, logs):
         metadata_path = self.model_path.replace('.h5', f'_epoch_{epoch + 1}_metadata.json')
@@ -63,6 +66,10 @@ class TrainingHistory(tf.keras.callbacks.Callback):
         }
         with open(metadata_path, 'w') as f:
             json.dump(metadata, f, indent=4)
+
+    def save_model_checkpoint(self, epoch):
+        model_checkpoint_path = self.model_path.replace('.h5', f'_epoch_{epoch + 1}.h5')
+        self.model.save(model_checkpoint_path)
 
 
 class TimeHistory(Callback):
@@ -226,13 +233,12 @@ def train_model(model, input_sequences, target_tokens, epochs, batch_size, model
                 callbacks=[time_callback, checkpoint_callback, history_callback]
             )
             model.save(model_path, include_optimizer=False, save_format='h5')
-            return history_callback.history, len(input_sequences)
+            return history, len(input_sequences)  # 修正: history_callback.historyからhistoryに変更
         except Exception as e:
             print(f"Training failed with exception: {e}")
             print(f"Learning rate: {learning_rate}, Batch size: {batch_size}, Epochs: {epochs}")
             print(f"Train data shape: {input_sequences.shape}, Target data shape: {target_tokens.shape}")
-            return float('inf'), 0  # infを返す
-            # return None, 0
+            return float('inf'), 0
     else:
         print("No data for training.")
         return None, 0

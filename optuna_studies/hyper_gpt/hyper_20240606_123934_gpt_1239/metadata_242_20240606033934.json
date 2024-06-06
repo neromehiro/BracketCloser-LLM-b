@@ -1,0 +1,21 @@
+{
+    "epoch": 1,
+    "logs": {
+        "loss": 0.9125139713287354,
+        "accuracy": 0.08469827473163605,
+        "weighted_accuracy": 0.19077670574188232,
+        "val_loss": 0.865333616733551,
+        "val_accuracy": 0.11810344457626343,
+        "val_weighted_accuracy": 0.25
+    },
+    "time": "20240606033934",
+    "model_architecture": "define_gpt_model",
+    "batch_size": 35,
+    "epochs": 1,
+    "learning_rate": 0.008910563483209628,
+    "embedding_dim": 122,
+    "gru_units": null,
+    "dropout_rate": 0.23052106140929007,
+    "recurrent_dropout_rate": null,
+    "num_layers": null
+}

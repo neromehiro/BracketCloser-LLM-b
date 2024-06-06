@@ -3,36 +3,38 @@ import optuna
 import os
 import numpy as np
 import tensorflow as tf
-from datetime import datetime
+from datetime import datetime, timedelta
 from tqdm import tqdm
 from modules.setup import setup, parse_time_limit
 from modules.objective import objective
 from modules.utils import create_save_folder
 from modules.data_utils import load_dataset, prepare_sequences, tokens
 from modules.training_utils import train_model, plot_training_history, save_metadata
+import glob
 
-# 訓練データのパス
 encode_dir_path = "./components/dataset/preprocessed/"
 model_save_base_path = "./models/"
 storage_base_path = "./optuna_studies/"
 
-# 初期設定のグローバル変数
 model_architecture_func = None
 architecture = None
 best_loss = float('inf')
 
-# 環境変数設定
 os.environ["WANDB_CONSOLE"] = "off"
 os.environ["WANDB_SILENT"] = "true"
+
+def clean_up_files(save_path, keep_files=['best_model.h5', 'training_history.png']):
+    files = glob.glob(os.path.join(save_path, '*'))
+    for file in files:
+        if os.path.basename(file) not in keep_files:
+            os.remove(file)
 
 def main():
     global model_architecture_func, architecture, best_loss
     
-    # 再開するか新規開始かを選択
     option = input("Choose an option:\n1. Resume existing study\n2. Start a new study\nEnter 1 or 2: ").strip()
     
     if option == "1":
-        # 再開する場合
         studies = [f for f in os.listdir(storage_base_path) if f.startswith("hyper_")]
         if not studies:
             print("No existing studies found. Starting a new study.")
@@ -43,16 +45,13 @@ def main():
             study_index = int(input("Enter the number of the study to resume: ").strip()) - 1
             study_folder = studies[study_index]
             study_name = study_folder
-
-            # アーキテクチャ名の部分を修正
             architecture_name_parts = study_folder.split('_')[1:2]
             architecture_name = architecture_name_parts[0]
-
             storage_name = f"sqlite:///{storage_base_path}/{study_folder}/optuna_study.db"
             model_architecture_func, architecture = setup(architecture_name)
+            save_path = os.path.join(storage_base_path, study_folder)
 
     if option == "2":
-        # 新規開始の場合
         architecture_name = input("Enter the model architecture (gru, transformer, lstm, bert, gpt): ").strip()
         model_architecture_func, architecture = setup(architecture_name)
 
@@ -87,10 +86,8 @@ def main():
 
     n_jobs = int(input("Enter the number of parallel jobs: ").strip())
 
-    save_path = os.path.join(storage_base_path, "hyper_" + architecture_name)
-
     try:
-        study.optimize(lambda trial: objective(trial, architecture, best_loss, encode_dir_path, lambda: create_save_folder(storage_base_path, architecture)), timeout=time_limit.total_seconds(), callbacks=[callback])
+        study.optimize(lambda trial: objective(trial, architecture, best_loss, encode_dir_path, lambda: create_save_folder(save_path, architecture)), timeout=time_limit.total_seconds(), callbacks=[callback])
     except Exception as e:
         print(f"An exception occurred during optimization: {e}")
     finally:
@@ -99,14 +96,12 @@ def main():
     print("Best hyperparameters: ", study.best_params)
     print("Best loss: ", study.best_value)
 
-    # ベストパラメータで再トレーニングして保存
     best_params = study.best_params
     epochs = best_params["epochs"]
     batch_size = best_params["batch_size"]
     learning_rate = best_params["learning_rate"]
     seq_length = 30
 
-    # モデル固有のベストパラメータの取得
     if architecture == "gru":
         embedding_dim = best_params["embedding_dim"]
         gru_units = best_params["gru_units"]
@@ -149,7 +144,7 @@ def main():
     all_target_tokens = []
 
     num_datasets = 0
-    num_files = 10  # num_filesを増やす
+    num_files = 10
 
     for dirpath, dirnames, filenames in os.walk(encode_dir_path):
         for file in filenames[:num_files]:
@@ -170,11 +165,10 @@ def main():
     all_input_sequences = np.array(all_input_sequences)
     all_target_tokens = np.array(all_target_tokens)
 
-    save_path = os.path.join(storage_base_path, "hyper_" + architecture)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
-    mirrored_strategy = tf.distribute.MirroredStrategy()  # 分散学習の設定を追加
+    mirrored_strategy = tf.distribute.MirroredStrategy()
 
     with mirrored_strategy.scope():
         model = model_architecture_func(seq_length, len(tokens) + 1, embedding_dim, num_heads, ffn_units, dropout_rate, learning_rate)
@@ -192,13 +186,13 @@ def main():
         num_files=num_files, 
         learning_rate=learning_rate, 
         architecture=architecture, 
-        model_architecture_func=model_architecture_func  # 追加された引数
+        model_architecture_func=model_architecture_func
     )
     
     if history:
         plot_training_history(history, save_path=plot_path, epochs=epochs, batch_size=batch_size, learning_rate=learning_rate, num_files=num_files, dataset_size=dataset_size)
 
-    model_size = os.path.getsize(model_path) / (1024 * 1024)  # MB単位に変換
+    model_size = os.path.getsize(model_path) / (1024 * 1024)
     model_params = model.count_params()
 
     metadata = {
@@ -212,6 +206,9 @@ def main():
         "model_architecture": model_architecture_func.__name__
     }
     save_metadata(model_path, metadata)
+
+    # Clean up unnecessary files, keeping only the latest model and training history
+    clean_up_files(save_path, keep_files=['best_model.h5', 'training_history.png', 'optuna_study.db'])
 
     print(f"Training finished.")
     print(f"Model size: {model_size:.2f} MB")
